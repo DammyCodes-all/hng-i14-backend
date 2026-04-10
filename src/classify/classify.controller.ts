@@ -3,7 +3,7 @@ import { Controller, Get, HttpException, Query } from '@nestjs/common';
 import { NormalizedResponse } from '../types';
 import { ClassifyService } from './classify.service';
 
-@Controller('classify')
+@Controller('api/classify')
 export class ClassifyController {
   constructor(private readonly classifyService: ClassifyService) {}
 
