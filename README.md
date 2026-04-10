@@ -18,7 +18,7 @@ Calls the Genderize API with the provided `name`, processes the response, and re
 
 ## Success Response (`200 OK`)
 
-```hng-i14-backend/README.md#L1-12
+```ts
 {
   "status": "success",
   "data": {
