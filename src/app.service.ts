@@ -5,7 +5,7 @@ export class AppService {
   sayHello() {
     return {
       status: 'success',
-      message: 'API is running',
+      message: 'API is live!',
     };
   }
 }
