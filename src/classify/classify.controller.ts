@@ -9,7 +9,7 @@ export class ClassifyController {
 
   @Get()
   async classifyName(@Query('name') name: string): Promise<NormalizedResponse> {
-    if (!name.trim())
+    if (!name?.trim())
       throw new HttpException(
         {
           status: 'error',
