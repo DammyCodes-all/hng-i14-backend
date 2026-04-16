@@ -23,7 +23,7 @@ export class ProfileController {
   }
 
   @Get(':id')
-  getProfile(@Param('id') id: string) {
+  getProfile(@Param('id', ParseUUIDPipe) id: UUID) {
     return this.profileService.getProfile(id);
   }
 

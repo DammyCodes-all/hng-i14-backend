@@ -51,7 +51,7 @@ export class ProfileService {
     };
   }
 
-  getProfile(id: string) {
+  getProfile(id: UUID) {
     const profile = this.profileStore.findById(id);
 
     return {
