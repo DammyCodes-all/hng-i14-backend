@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   NotFoundException,
   HttpException,
+  Query,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import type { UUID } from 'crypto';
@@ -51,14 +52,14 @@ export class ProfileController {
 
   @Get()
   getAllProfiles(
-    @Param('gender') gender: string,
-    @Param('country_id') country_id: string,
-    @Param('age_group') age_group: string,
+    @Query('gender') gender?: string,
+    @Query('country_id') country_id?: string,
+    @Query('age_group') age_group?: string,
   ) {
     return this.profileService.getAllProfiles(
-      gender.toLowerCase(),
-      country_id.toUpperCase(),
-      age_group.toLowerCase(),
+      gender?.toLowerCase(),
+      country_id?.toUpperCase(),
+      age_group?.toLowerCase(),
     );
   }
 
