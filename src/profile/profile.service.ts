@@ -54,6 +54,8 @@ export class ProfileService {
   getProfile(id: UUID) {
     const profile = this.profileStore.findById(id);
 
+    if (!profile) throw new Error('Profile not found');
+
     return {
       status: 'success',
       data: profile,
