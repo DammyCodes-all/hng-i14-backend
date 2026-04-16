@@ -6,7 +6,7 @@ import {
   GenderizeResponse,
   Profile,
 } from 'src/types';
-import { randomUUID } from 'crypto';
+import { randomUUID, UUID } from 'crypto';
 import { CreateProfileDto } from 'src/dto/profile';
 
 @Injectable()
@@ -70,7 +70,7 @@ export class ProfileService {
     };
   }
 
-  deleteProfile(id: string) {
+  deleteProfile(id: UUID) {
     this.profileStore.deleteById(id);
   }
 

@@ -7,9 +7,11 @@ import {
   HttpStatus,
   HttpCode,
   Delete,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { CreateProfileDto } from '../dto/profile';
 import { ProfileService } from './profile.service';
+import type { UUID } from 'crypto';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -32,7 +34,7 @@ export class ProfileController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  deleteProfile(@Param('id') id: string) {
+  deleteProfile(@Param('id', ParseUUIDPipe) id: UUID) {
     return this.profileService.deleteProfile(id);
   }
 }
