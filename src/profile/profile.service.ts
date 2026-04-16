@@ -116,7 +116,7 @@ export class ProfileService {
     const res = await fetch(`https://api.genderize.io/?name=${name}`);
     const data: GenderizeResponse = await res.json();
 
-    if (!data.gender) {
+    if (!data.gender || data.count === 0) {
       return null;
     }
 
@@ -131,7 +131,7 @@ export class ProfileService {
     const res = await fetch(`https://api.agify.io/?name=${name}`);
     const data: AgifyResponse = await res.json();
 
-    if (!data.age) {
+    if (!data.age || data.age === 0) {
       return null;
     }
 

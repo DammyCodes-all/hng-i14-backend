@@ -1,189 +1,139 @@
-# HNG i14 Backend — Stage 0: API Integration & Data Processing
+# HNG i14 Backend — Stage 1: Data Persistence & API Design
 
-A NestJS backend service that exposes a single endpoint to classify names by integrating with the [Genderize API](https://genderize.io/), then returning a normalized, processed response.
+This repository implements Stage 1 of the Backend Wizards assessment: accept a name, call three external APIs (Genderize, Agify, Nationalize), classify the results, persist a profile, and expose REST endpoints to manage the profiles.
 
-## Base URL
+This README summarizes:
+- What the current implementation provides
+- Which Stage 1 requirements are implemented vs. partially implemented or missing
+- How to run and test locally
+- A prioritized TODO checklist to reach grading compliance
 
-When running locally:
-
-- `http://localhost:3000`
-
-## Endpoint
-
-### `GET /api/classify?name={name}`
-
-Calls the Genderize API with the provided `name`, processes the response, and returns a structured payload.
+If you want me to make the code changes listed in the TODOs, tell me which ones to apply first and I will prepare the edits.
 
 ---
 
-## Success Response (`200 OK`)
+## Quick status (high-level)
+- Server framework: NestJS (TypeScript)
+- CORS: Enabled (`Access-Control-Allow-Origin: *`)
+- External APIs integrated: Genderize, Agify, Nationalize — the service calls all three.
+- Data store: in-memory `ProfileStoreService` (array) — NOT persisted to disk or DB.
+- Endpoints implemented: Create, Get single, Get all (with filters), Delete.
+- UUID generation: uses `crypto.randomUUID()` (Node runtime default).
+- Timestamps: `new Date().toISOString()` in UTC.
 
-```ts
+Important: The repository already contains endpoint implementations, but there are a few functional and compatibility issues that must be fixed for the Stage 1 grading to pass automatically (see Known Issues & TODOs).
+
+---
+
+## How to run (local)
+1. Install dependencies
+```
+/dev/null/example.md#L1-1
+pnpm install
+```
+
+2. Start development server
+```
+/dev/null/example.md#L1-1
+pnpm run start:dev
+```
+
+3. Default local base URL
+```
+/dev/null/example.md#L1-1
+http://localhost:3000
+```
+
+(If your project uses `npm`/`yarn` replace `pnpm` commands accordingly.)
+
+---
+
+## Implemented Endpoints (what's available now)
+
+1) Create Profile
+- POST /api/profiles
+- Body:
+```/dev/null/example.json#L1-3
+{ "name": "ella" }
+```
+- Current behavior:
+  - Checks request type and empty name at controller level.
+  - If a profile with the same name already exists in the in-memory store, returns a success response with the existing profile and a `message: "Profile already exists"`.
+  - Otherwise it calls the three external APIs in parallel, derives classification values, produces a `Profile` object and saves it to the in-memory store.
+- Returns: an object with `{ status: 'success', data: <profile>, ... }` (see Implementation notes for deviations from spec).
+
+2) Get Single Profile
+- GET /api/profiles/{id}
+- Current behavior:
+  - Returns `{ status: 'success', data: <profile> }` if found.
+  - Throws an error (controller converts to 404) if not found.
+
+3) Get All Profiles
+- GET /api/profiles
+- Optional query params: `gender`, `country_id`, `age_group`
+- Filtering: controller normalizes incoming filter values (gender and age_group to lowercase, country_id to uppercase) and filters the in-memory store.
+
+4) Delete Profile
+- DELETE /api/profiles/{id}
+- Returns 204 No Content when deletion succeeds.
+
+---
+
+## Expected API responses (Stage 1 required format)
+The grading script expects exact response structures. Example expected responses:
+
+- Successful create (201 Created)
+```/dev/null/example.json#L1-20
 {
   "status": "success",
   "data": {
-    "name": "john",
-    "gender": "male",
-    "probability": 0.99,
+    "id": "<uuid-v7>",
+    "name": "ella",
+    "gender": "female",
+    "gender_probability": 0.99,
     "sample_size": 1234,
-    "is_confident": true,
-    "processed_at": "2026-04-01T12:00:00.000Z"
+    "age": 46,
+    "age_group": "adult",
+    "country_id": "DRC",
+    "country_probability": 0.85,
+    "created_at": "2026-04-01T12:00:00Z"
   }
 }
 ```
 
-### Processing Rules Implemented
-
-- Extract `gender`, `probability`, and `count` from Genderize
-- Rename `count` to `sample_size`
-- Compute `is_confident`:
-  - `true` only when:
-    - `probability >= 0.7`
-    - `sample_size >= 100`
-  - otherwise `false`
-- Generate `processed_at` per request using UTC ISO-8601 (`new Date().toISOString()`)
-
----
-
-## Error Responses
-
-All errors follow this structure:
-
-```hng-i14-backend/README.md#L1-4
+- Duplicate (same name)
+```/dev/null/example.json#L1-20
 {
-  "status": "error",
-  "message": "<error message>"
+  "status": "success",
+  "message": "Profile already exists",
+  "data": { ...existing profile... }
 }
 ```
 
-### Expected Status Codes
+- Error format
+```/dev/null/example.json#L1-4
+{ "status": "error", "message": "<error message>" }
+```
 
-- `400 Bad Request` — Missing or empty `name` query parameter
-- `422 Unprocessable Entity` — `name` is not a string
-- `500 Internal Server Error` / `502 Bad Gateway` — Upstream or server failure
-
-### Genderize Edge Case
-
-If Genderize returns:
-
-- `gender: null` **or**
-- `count: 0`
-
-return:
-
-```hng-i14-backend/README.md#L1-4
+- 502 for invalid external API responses
+```/dev/null/example.json#L1-4
 {
   "status": "error",
-  "message": "No prediction available for the provided name"
+  "message": "${externalApi} returned an invalid response"
 }
 ```
 
----
-
-## CORS Requirement
-
-This service is configured to allow all origins:
-
-- `Access-Control-Allow-Origin: *`
-
-This is required so external graders/scripts can reach the endpoint.
 
 ---
 
-## Tech Stack
-
-- [NestJS](https://nestjs.com/)
-- TypeScript
-- Native Fetch API (Node runtime)
-
----
-
-## Project Structure (High-level)
-
-```hng-i14-backend/README.md#L1-12
-src/
-  app.module.ts
-  main.ts
-  types.ts
-  classify/
-    classify.module.ts
-    classify.controller.ts
-    classify.service.ts
-```
-
-> Note: your exact filenames may vary slightly depending on your local refactor.
+## Example expected sequence (happy path)
+1. POST /api/profiles { "name": "ella" } → service concurrently calls:
+   - https://api.genderize.io?name=ella
+   - https://api.agify.io?name=ella
+   - https://api.nationalize.io?name=ella
+2. Validate responses per edge-case rules
+3. Build profile object (uuid v7, created_at in utc iso)
+4. Save to persistent store
+5. Return 201 with the profile JSON (exact fields order not required, but keys must be present)
 
 ---
-
-## Getting Started
-
-### 1) Install dependencies
-
-```hng-i14-backend/README.md#L1-1
-pnpm install
-```
-
-### 2) Run in development
-
-```hng-i14-backend/README.md#L1-1
-pnpm run start:dev
-```
-
-### 3) Build
-
-```hng-i14-backend/README.md#L1-1
-pnpm run build
-```
-
-### 4) Run production build
-
-```hng-i14-backend/README.md#L1-1
-pnpm run start:prod
-```
-
----
-
-## Quick Test
-
-```hng-i14-backend/README.md#L1-1
-curl "http://localhost:3000/api/classify?name=john"
-```
-
-Expected: `status: "success"` response with normalized data fields.
-
----
-
-## Performance Note
-
-The endpoint processing overhead is lightweight; response-time target is under `500ms` excluding external API latency.
-
----
-
-## Deployment
-
-Deploy on any supported host (e.g. Railway, Vercel, Heroku, AWS, PXXL App).  
-Render is not accepted for this assessment.
-
-Make sure your deployed URL exposes:
-
-- `GET /api/classify?name={name}`
-
----
-
-## Submission Checklist
-
-- [x] Single GET endpoint implemented
-- [x] Genderize API integration
-- [x] Data extraction and normalization
-- [x] `is_confident` logic
-- [x] Dynamic `processed_at`
-- [x] Standardized error format
-- [x] Edge-case handling for unavailable prediction
-- [x] CORS `*`
-- [x] README included
-
----
-
-## License
-
-This project is provided for HNG Stage 0 assessment purposes.
