@@ -50,8 +50,16 @@ export class ProfileController {
   }
 
   @Get()
-  getAllProfiles() {
-    return this.profileService.getAllProfiles();
+  getAllProfiles(
+    @Param('gender') gender: string,
+    @Param('country_id') country_id: string,
+    @Param('age_group') age_group: string,
+  ) {
+    return this.profileService.getAllProfiles(
+      gender.toLowerCase(),
+      country_id.toUpperCase(),
+      age_group.toUpperCase(),
+    );
   }
 
   @Delete(':id')

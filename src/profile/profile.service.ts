@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ProfileStoreService } from './profile-store.service';
 import {
   AgifyResponse,
@@ -7,15 +7,14 @@ import {
   Profile,
 } from 'src/types';
 import { randomUUID, UUID } from 'crypto';
-import { CreateProfileDto } from 'src/dto/profile';
 
 @Injectable()
 export class ProfileService {
   constructor(private readonly profileStore: ProfileStoreService) {}
 
-  async createProfile(
-    createProfileDto: CreateProfileDto,
-  ): Promise<{ status: string; data?: Profile; message?: string }> {
+  async createProfile(createProfileDto: {
+    name: string;
+  }): Promise<{ status: string; data?: Profile; message?: string }> {
     const existingProfile = this.profileStore.findByName(createProfileDto.name);
     if (existingProfile) {
       return {
@@ -31,6 +30,36 @@ export class ProfileService {
       this.fetchNation(createProfileDto.name),
     ]);
 
+    if (!genderData) {
+      throw new HttpException(
+        {
+          status: '502',
+          message: 'Genderize API returned an invalid response',
+        },
+        502,
+      );
+    }
+
+    if (!nationData) {
+      throw new HttpException(
+        {
+          status: '502',
+          message: 'Nationalize API returned an invalid response',
+        },
+        502,
+      );
+    }
+
+    if (!ageData) {
+      throw new HttpException(
+        {
+          status: '502',
+          message: 'Agify API returned an invalid response',
+        },
+        502,
+      );
+    }
+
     const profile: Profile = {
       id: randomUUID(),
       name: createProfileDto?.name,
@@ -43,6 +72,7 @@ export class ProfileService {
       country_probability: nationData?.country_probability,
       created_at: new Date().toISOString(),
     };
+
     this.profileStore.save(profile);
 
     return {
@@ -62,8 +92,14 @@ export class ProfileService {
     };
   }
 
-  getAllProfiles() {
-    const profiles = this.profileStore.findAll();
+  getAllProfiles(gender?: string, country_id?: string, age_group?: string) {
+    const profiles = this.profileStore.findAll().filter((p) => {
+      return (
+        (gender === undefined || p.gender === gender) &&
+        (country_id === undefined || p.country_id === country_id) &&
+        (age_group === undefined || p.age_group === age_group)
+      );
+    });
 
     return {
       status: 'success',
@@ -79,6 +115,11 @@ export class ProfileService {
   private async fetchGender(name: string) {
     const res = await fetch(`https://api.genderize.io/?name=${name}`);
     const data: GenderizeResponse = await res.json();
+
+    if (!data.gender) {
+      return null;
+    }
+
     return {
       gender: data.gender,
       gender_probability: data.probability,
@@ -89,6 +130,10 @@ export class ProfileService {
   private async fetchAge(name: string) {
     const res = await fetch(`https://api.agify.io/?name=${name}`);
     const data: AgifyResponse = await res.json();
+
+    if (!data.age) {
+      return null;
+    }
 
     let ageGroup: string;
     if (data.age < 12) {
@@ -110,6 +155,10 @@ export class ProfileService {
   private async fetchNation(name: string) {
     const res = await fetch(`https://api.nationalize.io/?name=${name}`);
     const data: CountryResponse = await res.json();
+
+    if (!data.country) {
+      return null;
+    }
 
     const country_id: string | undefined = data?.country[0]?.country_id;
     const country_probability: number | undefined =
