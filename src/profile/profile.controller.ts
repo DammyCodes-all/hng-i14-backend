@@ -30,7 +30,7 @@ export class ProfileController {
 
     if (!createProfileDto.name) {
       throw new HttpException(
-        'Bad Request: Missing or empty namw',
+        'Bad Request: Missing or empty name',
         HttpStatus.BAD_REQUEST,
       );
     }
