@@ -58,7 +58,7 @@ export class ProfileController {
     return this.profileService.getAllProfiles(
       gender.toLowerCase(),
       country_id.toUpperCase(),
-      age_group.toUpperCase(),
+      age_group.toLowerCase(),
     );
   }
 
