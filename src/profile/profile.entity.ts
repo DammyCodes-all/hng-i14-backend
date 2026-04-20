@@ -13,7 +13,7 @@ export class ProfileEntity {
   @Column()
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   gender: string | null;
 
   @Column({ type: 'real', nullable: true })
@@ -22,13 +22,13 @@ export class ProfileEntity {
   @Column({ type: 'integer', nullable: true })
   age: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   age_group: string | null;
 
-  @Column({ nullable: true, length: 2 })
+  @Column({ type: 'text', nullable: true, length: 2 })
   country_id: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   country_name: string | null;
 
   @Column({ type: 'real', nullable: true })
