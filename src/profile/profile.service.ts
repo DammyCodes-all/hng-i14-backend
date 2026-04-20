@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { ProfileStoreService } from './profile-store.service';
 import {
   AgifyResponse,
@@ -7,10 +7,17 @@ import {
   Profile,
 } from 'src/types';
 import { randomUUID, UUID } from 'crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ProfileEntity } from './profile.entity';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly profileStore: ProfileStoreService) {}
+  constructor(
+    private readonly profileStore: ProfileStoreService,
+    @InjectRepository(ProfileEntity)
+    private readonly profileRepository: Repository<ProfileEntity>,
+  ) {}
 
   async createProfile(createProfileDto: {
     name: string;
