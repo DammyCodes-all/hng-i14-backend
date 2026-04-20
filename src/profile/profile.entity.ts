@@ -1,34 +1,39 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from 'typeorm';
 
 @Entity('profiles')
 export class ProfileEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column()
   name: string;
 
-  @Column()
-  gender: string;
+  @Column({ nullable: true })
+  gender: string | null;
 
-  @Column()
-  gender_probability: number;
+  @Column({ type: 'real', nullable: true })
+  gender_probability: number | null;
 
-  @Column()
-  age: number;
+  @Column({ type: 'integer', nullable: true })
+  age: number | null;
 
-  @Column()
-  age_group: string;
+  @Column({ nullable: true })
+  age_group: string | null;
 
-  @Column()
-  country_id: string;
+  @Column({ nullable: true, length: 2 })
+  country_id: string | null;
 
-  @Column()
-  country_name: string;
+  @Column({ nullable: true })
+  country_name: string | null;
 
-  @Column()
-  country_probability: number;
+  @Column({ type: 'real', nullable: true })
+  country_probability: number | null;
 
-  @Column()
+  @CreateDateColumn({ type: 'datetime' })
   created_at: Date;
 }

@@ -4,7 +4,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ProfileModule } from './profile/profile.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ProfileEntity } from './profile/profile.entity';
 
 @Module({
   imports: [
@@ -14,8 +13,8 @@ import { ProfileEntity } from './profile/profile.entity';
       type: 'sqlite',
       synchronize: true,
       database: 'db/database.db',
-      entities: [ProfileEntity],
       logging: true,
+      autoLoadEntities: true,
     }),
   ],
   providers: [AppService],

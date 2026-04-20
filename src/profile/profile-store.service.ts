@@ -1,14 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Profile } from '../types';
 
-/**
- * Simple in-memory store for Profile objects.
- *
- * Notes:
- * - Profile.id is treated as a string (UUID) across the app to avoid coupling to crypto UUID types.
- * - Methods use `string` for id parameters and return types.
- * - This store is intentionally lightweight and synchronous to match the Stage 1 assessment.
- */
 @Injectable()
 export class ProfileStoreService {
   private store: Profile[] = [];
