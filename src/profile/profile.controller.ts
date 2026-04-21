@@ -11,10 +11,10 @@ import {
   NotFoundException,
   HttpException,
   Query,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import type { UUID } from 'crypto';
+import { GetAllProfileQueryDto } from './dto/profile.dto';
 
 @Controller('api/profiles')
 export class ProfileController {
@@ -52,30 +52,8 @@ export class ProfileController {
   }
 
   @Get()
-  getAllProfiles(
-    @Query('gender') gender?: string,
-    @Query('country_id') country_id?: string,
-    @Query('age_group') age_group?: string,
-    @Query('min_age', ParseIntPipe) min_age?: number,
-    @Query('max_age', ParseIntPipe) max_age?: number,
-    @Query('min_gender_probability', ParseIntPipe)
-    min_gender_probability?: number,
-    @Query('min_country_probability', ParseIntPipe)
-    min_country_probability?: number,
-    @Query('sort_by') sort_by?: string,
-    @Query('order') order?: string,
-  ) {
-    return this.profileService.getAllProfiles(
-      gender?.toLowerCase(),
-      country_id?.toUpperCase(),
-      age_group?.toLowerCase(),
-      min_age,
-      max_age,
-      min_gender_probability,
-      min_country_probability,
-      sort_by?.toLowerCase(),
-      order?.toLowerCase(),
-    );
+  getAllProfiles(@Query() query: GetAllProfileQueryDto) {
+    return this.profileService.getAllProfiles(query);
   }
 
   @Delete(':id')

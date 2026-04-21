@@ -9,6 +9,7 @@ import { UUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
+import { GetAllProfileQueryDto } from './dto/profile.dto';
 
 @Injectable()
 export class ProfileService {
@@ -136,56 +137,50 @@ export class ProfileService {
     };
   }
 
-  async getAllProfiles(
-    gender?: string,
-    country_id?: string,
-    age_group?: string,
-    min_age?: number,
-    max_age?: number,
-    min_gender_probability?: number,
-    min_country_probability?: number,
-    sort_by?: string,
-    order?: string,
-  ) {
-    const qb = this.profileRepository.createQueryBuilder('profile');
+  async getAllProfiles(query: GetAllProfileQueryDto) {
+    const {
+      gender,
+      country_id,
+      age_group,
+      min_age,
+      max_age,
+      min_gender_probability,
+      min_country_probability,
+      sort_by,
+      order,
+      page,
+      limit,
+    } = query;
 
-    if (typeof gender === 'string' && gender.length > 0) {
-      qb.andWhere('profile.gender = :gender', { gender });
-    }
+    const qb = this.profileRepository.createQueryBuilder('p');
 
-    if (typeof sort_by === 'string' && sort_by.length > 0) {
-      qb.orderBy(`profile.${sort_by}`, order === 'desc' ? 'DESC' : 'ASC');
-    }
+    if (gender) qb.andWhere('p.gender = :gender', { gender });
+    if (country_id) qb.andWhere('p.country_id = :country_id', { country_id });
+    if (age_group) qb.andWhere('p.age_group = :age_group', { age_group });
 
-    if (typeof country_id === 'string' && country_id.length > 0) {
-      qb.andWhere('profile.country_id = :country_id', { country_id });
-    }
+    if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
+    if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
 
-    if (typeof age_group === 'string' && age_group.length > 0) {
-      qb.andWhere('profile.age_group = :age_group', { age_group });
-    }
-
-    if (typeof min_age === 'number') {
-      qb.andWhere('profile.age >= :min_age', { min_age });
-    }
-
-    if (typeof max_age === 'number') {
-      qb.andWhere('profile.age <= :max_age', { max_age });
-    }
-
-    if (typeof min_gender_probability === 'number') {
-      qb.andWhere('profile.gender_probability >= :mgp', {
+    if (min_gender_probability != null)
+      qb.andWhere('p.gender_probability >= :mgp', {
         mgp: min_gender_probability,
       });
-    }
 
-    if (typeof min_country_probability === 'number') {
-      qb.andWhere('profile.country_probability >= :mcp', {
+    if (min_country_probability != null)
+      qb.andWhere('p.country_probability >= :mcp', {
         mcp: min_country_probability,
       });
+
+    if (sort_by) {
+      const direction = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+      qb.orderBy(`p.${sort_by}`, direction);
     }
 
-    const entities = await qb.getMany();
+    if (page != null && limit != null) {
+      qb.skip((page - 1) * limit).take(limit);
+    }
+
+    const [entities, total] = await qb.getManyAndCount();
 
     const profiles: Profile[] = entities.map((e) => ({
       id: e.id,
@@ -201,7 +196,9 @@ export class ProfileService {
 
     return {
       status: 'success',
-      count: profiles.length,
+      total,
+      page,
+      limit,
       data: profiles,
     };
   }
