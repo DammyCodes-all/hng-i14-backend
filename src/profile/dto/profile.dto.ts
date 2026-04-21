@@ -49,7 +49,7 @@ export class GetAllProfileQueryDto {
   min_country_probability?: number;
 
   @IsOptional()
-  @IsIn(['created_at', 'name', 'age'])
+  @IsIn(['created_at', 'age', 'gender_probability'])
   sort_by?: string;
 
   @IsOptional()

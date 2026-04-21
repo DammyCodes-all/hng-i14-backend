@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
 import { GetAllProfileQueryDto } from './dto/profile.dto';
 
+// eslint-disable @typescript-eslint/no-unsafe-assignment
 @Injectable()
 export class ProfileService {
   constructor(
@@ -154,9 +155,18 @@ export class ProfileService {
 
     const qb = this.profileRepository.createQueryBuilder('p');
 
-    if (gender) qb.andWhere('p.gender = :gender', { gender });
-    if (country_id) qb.andWhere('p.country_id = :country_id', { country_id });
-    if (age_group) qb.andWhere('p.age_group = :age_group', { age_group });
+    if (gender)
+      qb.andWhere('LOWER(p.gender) = :gender', {
+        gender: gender.toLowerCase(),
+      });
+    if (country_id)
+      qb.andWhere('UPPER(p.country_id) = :country_id', {
+        country_id: country_id.toUpperCase(),
+      });
+    if (age_group)
+      qb.andWhere('LOWER(p.age_group) = :age_group', {
+        age_group: age_group.toLowerCase(),
+      });
 
     if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
     if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
@@ -172,7 +182,8 @@ export class ProfileService {
       });
 
     if (sort_by) {
-      const direction = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+      const direction =
+        (order || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
       qb.orderBy(`p.${sort_by}`, direction);
     }
 
@@ -190,6 +201,7 @@ export class ProfileService {
       age: e.age ?? null,
       age_group: e.age_group ?? null,
       country_id: e.country_id ?? null,
+      country_name: e.country_name ?? null,
       country_probability: e.country_probability ?? null,
       created_at: e.created_at.toISOString(),
     }));
@@ -257,7 +269,7 @@ export class ProfileService {
     name: string,
   ): Promise<{ country_id?: string; country_probability?: number } | null> {
     const res = await fetch(`https://api.nationalize.io/?name=${name}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    // eslint-disable @typescript-eslint/no-unsafe-assignment
     const data: CountryResponse = await res.json();
 
     if (!data.country) {
