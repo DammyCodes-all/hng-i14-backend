@@ -144,37 +144,43 @@ export class ProfileService {
     max_age?: number,
     min_gender_probability?: number,
     min_country_probability?: number,
+    sort_by?: string,
+    order?: string,
   ) {
-    const qb = this.profileRepository.createQueryBuilder('p');
+    const qb = this.profileRepository.createQueryBuilder('profile');
 
     if (typeof gender === 'string' && gender.length > 0) {
-      qb.andWhere('p.gender = :gender', { gender });
+      qb.andWhere('profile.gender = :gender', { gender });
+    }
+
+    if (typeof sort_by === 'string' && sort_by.length > 0) {
+      qb.orderBy(`profile.${sort_by}`, order === 'desc' ? 'DESC' : 'ASC');
     }
 
     if (typeof country_id === 'string' && country_id.length > 0) {
-      qb.andWhere('p.country_id = :country_id', { country_id });
+      qb.andWhere('profile.country_id = :country_id', { country_id });
     }
 
     if (typeof age_group === 'string' && age_group.length > 0) {
-      qb.andWhere('p.age_group = :age_group', { age_group });
+      qb.andWhere('profile.age_group = :age_group', { age_group });
     }
 
     if (typeof min_age === 'number') {
-      qb.andWhere('p.age >= :min_age', { min_age });
+      qb.andWhere('profile.age >= :min_age', { min_age });
     }
 
     if (typeof max_age === 'number') {
-      qb.andWhere('p.age <= :max_age', { max_age });
+      qb.andWhere('profile.age <= :max_age', { max_age });
     }
 
     if (typeof min_gender_probability === 'number') {
-      qb.andWhere('p.gender_probability >= :mgp', {
+      qb.andWhere('profile.gender_probability >= :mgp', {
         mgp: min_gender_probability,
       });
     }
 
     if (typeof min_country_probability === 'number') {
-      qb.andWhere('p.country_probability >= :mcp', {
+      qb.andWhere('profile.country_probability >= :mcp', {
         mcp: min_country_probability,
       });
     }
@@ -201,76 +207,51 @@ export class ProfileService {
   }
 
   async deleteProfile(id: UUID) {
-    await this.profileRepository.delete({ id });
+    await this.profileRepository.delete({ id: id as unknown as string });
   }
 
   private async fetchGender(
     name: string,
   ): Promise<{ gender: string; gender_probability: number } | null> {
-    const res = await fetch(
-      `https://api.genderize.io/?name=${encodeURIComponent(name)}`,
-    );
-    if (!res.ok) {
+    const res = await fetch(`https://api.genderize.io/?name=${name}`);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const data: GenderizeResponse = await res.json();
+
+    if (!data.gender || data.count === 0) {
       return null;
     }
 
-    const raw: unknown = await res.json();
-    if (!raw || typeof raw !== 'object') return null;
-    const obj = raw as Record<string, unknown>;
-
-    const gender =
-      typeof obj.gender === 'string' && obj.gender.length > 0
-        ? obj.gender
-        : null;
-
-    const probRaw = obj.probability;
-    const probability =
-      typeof probRaw === 'number'
-        ? probRaw
-        : typeof probRaw === 'string'
-          ? Number(probRaw)
-          : 0;
-
-    if (!gender) return null;
-
     return {
-      gender,
-      gender_probability: Number.isFinite(probability) ? probability : 0,
+      gender: data.gender,
+      gender_probability: data.probability ?? 0,
     };
   }
 
   private async fetchAge(
     name: string,
   ): Promise<{ age: number; age_group: string } | null> {
-    const res = await fetch(
-      `https://api.agify.io/?name=${encodeURIComponent(name)}`,
-    );
-    if (!res.ok) return null;
+    const res = await fetch(`https://api.agify.io/?name=${name}`);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const data: AgifyResponse = await res.json();
 
-    const raw: unknown = await res.json();
-    if (!raw || typeof raw !== 'object') return null;
-    const obj = raw as Record<string, unknown>;
-
-    const ageRaw = obj.age;
-    const ageNum = typeof ageRaw === 'number' ? ageRaw : Number(ageRaw ?? NaN);
-
-    if (!Number.isFinite(ageNum) || ageNum === 0) {
+    if (!data.age || data.age === 0) {
       return null;
     }
 
     let ageGroup: string;
-    if (ageNum < 12) {
+    if (data.age < 12) {
       ageGroup = 'child';
-    } else if (ageNum < 19) {
+    } else if (data.age < 19) {
       ageGroup = 'teenager';
-    } else if (ageNum < 59) {
+    } else if (data.age < 59) {
       ageGroup = 'adult';
     } else {
       ageGroup = 'senior';
     }
 
     return {
-      age: Math.floor(ageNum),
+      age: data.age,
       age_group: ageGroup,
     };
   }
@@ -278,46 +259,21 @@ export class ProfileService {
   private async fetchNation(
     name: string,
   ): Promise<{ country_id?: string; country_probability?: number } | null> {
-    const res = await fetch(
-      `https://api.nationalize.io/?name=${encodeURIComponent(name)}`,
-    );
-    if (!res.ok) return null;
+    const res = await fetch(`https://api.nationalize.io/?name=${name}`);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const data: CountryResponse = await res.json();
 
-    const raw: unknown = await res.json();
-    if (!raw || typeof raw !== 'object') return null;
-    const obj = raw as Record<string, unknown>;
-
-    const countryArr = Array.isArray(obj.country) ? obj.country : undefined;
-    if (!Array.isArray(countryArr) || countryArr.length === 0) return null;
-
-    const top = countryArr[0] as Record<string, unknown>;
-    const country_id =
-      typeof top?.country_id === 'string' && top.country_id.length > 0
-        ? (top.country_id as string)
-        : undefined;
-
-    const probRaw = top?.probability;
-    const country_probability =
-      typeof probRaw === 'number'
-        ? probRaw
-        : typeof probRaw === 'string'
-          ? Number(probRaw)
-          : undefined;
-
-    if (
-      !country_id &&
-      (country_probability === undefined || Number.isNaN(country_probability))
-    ) {
+    if (!data.country) {
       return null;
     }
 
+    const country_id: string | undefined = data?.country[0]?.country_id;
+    const country_probability: number | undefined =
+      data?.country[0]?.probability;
+
     return {
       country_id,
-      country_probability:
-        country_probability !== undefined &&
-        Number.isFinite(country_probability)
-          ? country_probability
-          : undefined,
+      country_probability,
     };
   }
 }

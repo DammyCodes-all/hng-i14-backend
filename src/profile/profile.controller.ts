@@ -62,6 +62,8 @@ export class ProfileController {
     min_gender_probability?: number,
     @Query('min_country_probability', ParseIntPipe)
     min_country_probability?: number,
+    @Query('sort_by') sort_by?: string,
+    @Query('order') order?: string,
   ) {
     return this.profileService.getAllProfiles(
       gender?.toLowerCase(),
@@ -71,6 +73,8 @@ export class ProfileController {
       max_age,
       min_gender_probability,
       min_country_probability,
+      sort_by?.toLowerCase(),
+      order?.toLowerCase(),
     );
   }
 
