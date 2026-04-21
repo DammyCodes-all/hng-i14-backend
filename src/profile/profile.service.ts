@@ -9,7 +9,13 @@ import { UUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
-import { GetAllProfileQueryDto } from './dto/profile.dto';
+import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
+import {
+  parseAboveValue,
+  parseBelowValue,
+  parseFromCountry,
+} from './utils/nl-parsers';
+import { fetchGender, fetchAge, fetchNation } from './utils/fetchers';
 
 // eslint-disable @typescript-eslint/no-unsafe-assignment
 @Injectable()
@@ -47,9 +53,9 @@ export class ProfileService {
     }
 
     const [genderData, ageData, nationData] = await Promise.all([
-      this.fetchGender(createProfileDto.name),
-      this.fetchAge(createProfileDto.name),
-      this.fetchNation(createProfileDto.name),
+      fetchGender(createProfileDto.name),
+      fetchAge(createProfileDto.name),
+      fetchNation(createProfileDto.name),
     ]);
 
     if (!genderData) {
@@ -138,17 +144,18 @@ export class ProfileService {
     };
   }
 
-  async naturalLanguageSearch(q: string) {
+  async naturalLanguageSearch(queryObj: SearchProfileDto) {
+    const { q, page, limit } = queryObj;
     const raw = q || '';
     const query = raw.toLowerCase();
     const qb = this.profileRepository.createQueryBuilder('p');
 
     const genderMatch = query.includes('male and female')
       ? null
-      : query.includes('male') || query.includes('males')
-        ? 'male'
-        : query.includes('female') || query.includes('females')
-          ? 'female'
+      : query.includes('female') || query.includes('females')
+        ? 'female'
+        : query.includes('male') || query.includes('males')
+          ? 'male'
           : null;
 
     const ageGroupMatch = query.includes('child')
@@ -183,9 +190,9 @@ export class ProfileService {
         max: ageLimits.max,
       });
 
-    const minAge = this.parseAboveValue(raw);
-    const maxAge = this.parseBelowValue(raw);
-    const fromCountry = this.parseFromCountry(raw);
+    const minAge = parseAboveValue(raw);
+    const maxAge = parseBelowValue(raw);
+    const fromCountry = parseFromCountry(raw);
 
     if (minAge != null) {
       qb.andWhere('p.age >= :min_age', { min_age: minAge });
@@ -209,6 +216,10 @@ export class ProfileService {
       }
     }
 
+    if (page && limit) {
+      qb.skip((page - 1) * limit).take(limit);
+    }
+
     const [entities, total] = await qb.getManyAndCount();
     const profiles = entities.map((e) => ({
       id: e.id,
@@ -226,47 +237,10 @@ export class ProfileService {
     return {
       status: 'success',
       total,
-      page: 1,
-      limit: profiles.length,
+      page,
+      limit,
       data: profiles,
     };
-  }
-
-  private parseAboveValue(text: string): number | null {
-    if (!text) return null;
-    const m = text.match(/(?:above|over|more than|older than|>)\s*(\d+)\b/i);
-    if (!m) return null;
-    const n = parseInt(m[1], 10);
-    return Number.isNaN(n) ? null : n;
-  }
-
-  private parseBelowValue(text: string): number | null {
-    if (!text) return null;
-    const m = text.match(/(?:below|under|less than|younger than|<)\s*(\d+)\b/i);
-    if (!m) return null;
-    const n = parseInt(m[1], 10);
-    return Number.isNaN(n) ? null : n;
-  }
-
-  private parseFromCountry(
-    text: string,
-  ): { country_id?: string; country_name?: string } | null {
-    if (!text) return null;
-
-    const m = text.match(/\bfrom\s+([A-Za-z][A-Za-z\s\.\-']{0,60})/i);
-    if (!m) return null;
-
-    let candidate = m[1].trim();
-
-    candidate = candidate.replace(/^\s*the\s+/i, '').trim();
-
-    const compact = candidate.replace(/[\.\s]+/g, '');
-
-    if (/^[A-Za-z]{2,3}$/.test(compact)) {
-      return { country_id: compact.toUpperCase() };
-    }
-
-    return { country_name: candidate.toLowerCase() };
   }
 
   async getAllProfiles(query: GetAllProfileQueryDto) {
@@ -347,73 +321,6 @@ export class ProfileService {
   }
 
   async deleteProfile(id: UUID) {
-    await this.profileRepository.delete({ id: id as unknown as string });
-  }
-
-  private async fetchGender(
-    name: string,
-  ): Promise<{ gender: string; gender_probability: number } | null> {
-    const res = await fetch(`https://api.genderize.io/?name=${name}`);
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const data: GenderizeResponse = await res.json();
-
-    if (!data.gender || data.count === 0) {
-      return null;
-    }
-
-    return {
-      gender: data.gender,
-      gender_probability: data.probability ?? 0,
-    };
-  }
-
-  private async fetchAge(
-    name: string,
-  ): Promise<{ age: number; age_group: string } | null> {
-    const res = await fetch(`https://api.agify.io/?name=${name}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const data: AgifyResponse = await res.json();
-
-    if (!data.age || data.age === 0) {
-      return null;
-    }
-
-    let ageGroup: string;
-    if (data.age < 12) {
-      ageGroup = 'child';
-    } else if (data.age < 19) {
-      ageGroup = 'teenager';
-    } else if (data.age < 59) {
-      ageGroup = 'adult';
-    } else {
-      ageGroup = 'senior';
-    }
-
-    return {
-      age: data.age,
-      age_group: ageGroup,
-    };
-  }
-
-  private async fetchNation(
-    name: string,
-  ): Promise<{ country_id?: string; country_probability?: number } | null> {
-    const res = await fetch(`https://api.nationalize.io/?name=${name}`);
-    // eslint-disable @typescript-eslint/no-unsafe-assignment
-    const data: CountryResponse = await res.json();
-
-    if (!data.country) {
-      return null;
-    }
-
-    const country_id: string | undefined = data?.country[0]?.country_id;
-    const country_probability: number | undefined =
-      data?.country[0]?.probability;
-
-    return {
-      country_id,
-      country_probability,
-    };
+    await this.profileRepository.delete({ id });
   }
 }

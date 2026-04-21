@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import type { UUID } from 'crypto';
-import { GetAllProfileQueryDto } from './dto/profile.dto';
+import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
 
 @Controller('api/profiles')
 export class ProfileController {
@@ -39,8 +39,8 @@ export class ProfileController {
   }
 
   @Get('search')
-  searchProfiles(@Query() query: { q: string }) {
-    return this.profileService.naturalLanguageSearch(query.q);
+  searchProfiles(@Query() query: SearchProfileDto) {
+    return this.profileService.naturalLanguageSearch(query);
   }
 
   @Get()
