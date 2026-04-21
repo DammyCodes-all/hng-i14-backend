@@ -138,6 +138,137 @@ export class ProfileService {
     };
   }
 
+  async naturalLanguageSearch(q: string) {
+    const raw = q || '';
+    const query = raw.toLowerCase();
+    const qb = this.profileRepository.createQueryBuilder('p');
+
+    const genderMatch = query.includes('male and female')
+      ? null
+      : query.includes('male') || query.includes('males')
+        ? 'male'
+        : query.includes('female') || query.includes('females')
+          ? 'female'
+          : null;
+
+    const ageGroupMatch = query.includes('child')
+      ? 'child'
+      : query.includes('teenager')
+        ? 'teenager'
+        : query.includes('adult')
+          ? 'adult'
+          : query.includes('senior')
+            ? 'senior'
+            : null;
+
+    const ageLimits = query.includes('young')
+      ? { min: 16, max: 24 }
+      : query.includes('old')
+        ? { min: 60, max: 120 }
+        : null;
+
+    if (ageGroupMatch)
+      qb.andWhere('LOWER(p.age_group) = :age_group', {
+        age_group: ageGroupMatch,
+      });
+
+    if (genderMatch)
+      qb.andWhere('LOWER(p.gender) = :gender', {
+        gender: genderMatch,
+      });
+
+    if (ageLimits)
+      qb.andWhere('p.age BETWEEN :min AND :max', {
+        min: ageLimits.min,
+        max: ageLimits.max,
+      });
+
+    const minAge = this.parseAboveValue(raw);
+    const maxAge = this.parseBelowValue(raw);
+    const fromCountry = this.parseFromCountry(raw);
+
+    if (minAge != null) {
+      qb.andWhere('p.age >= :min_age', { min_age: minAge });
+    }
+
+    if (maxAge != null) {
+      qb.andWhere('p.age <= :max_age', { max_age: maxAge });
+    }
+
+    if (fromCountry) {
+      if (fromCountry.country_id) {
+        const cidParam = fromCountry.country_id.toUpperCase();
+        qb.andWhere('UPPER(p.country_id) = :country_id', {
+          country_id: cidParam,
+        });
+      } else if (fromCountry.country_name) {
+        const nameParam = `%${fromCountry.country_name.toLowerCase()}%`;
+        qb.andWhere('LOWER(p.country_name) LIKE :country_name', {
+          country_name: nameParam,
+        });
+      }
+    }
+
+    const [entities, total] = await qb.getManyAndCount();
+    const profiles = entities.map((e) => ({
+      id: e.id,
+      name: e.name,
+      gender: e.gender ?? null,
+      gender_probability: e.gender_probability ?? null,
+      age: e.age ?? null,
+      age_group: e.age_group ?? null,
+      country_id: e.country_id ?? null,
+      country_name: e.country_name ?? null,
+      country_probability: e.country_probability ?? null,
+      created_at: e.created_at.toISOString(),
+    }));
+
+    return {
+      status: 'success',
+      total,
+      page: 1,
+      limit: profiles.length,
+      data: profiles,
+    };
+  }
+
+  private parseAboveValue(text: string): number | null {
+    if (!text) return null;
+    const m = text.match(/(?:above|over|more than|older than|>)\s*(\d+)\b/i);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  private parseBelowValue(text: string): number | null {
+    if (!text) return null;
+    const m = text.match(/(?:below|under|less than|younger than|<)\s*(\d+)\b/i);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  private parseFromCountry(
+    text: string,
+  ): { country_id?: string; country_name?: string } | null {
+    if (!text) return null;
+
+    const m = text.match(/\bfrom\s+([A-Za-z][A-Za-z\s\.\-']{0,60})/i);
+    if (!m) return null;
+
+    let candidate = m[1].trim();
+
+    candidate = candidate.replace(/^\s*the\s+/i, '').trim();
+
+    const compact = candidate.replace(/[\.\s]+/g, '');
+
+    if (/^[A-Za-z]{2,3}$/.test(compact)) {
+      return { country_id: compact.toUpperCase() };
+    }
+
+    return { country_name: candidate.toLowerCase() };
+  }
+
   async getAllProfiles(query: GetAllProfileQueryDto) {
     const {
       gender,

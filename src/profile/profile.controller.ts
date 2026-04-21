@@ -38,6 +38,16 @@ export class ProfileController {
     return await this.profileService.createProfile(createProfileDto);
   }
 
+  @Get('search')
+  searchProfiles(@Query() query: { q: string }) {
+    return this.profileService.naturalLanguageSearch(query.q);
+  }
+
+  @Get()
+  getAllProfiles(@Query() query: GetAllProfileQueryDto) {
+    return this.profileService.getAllProfiles(query);
+  }
+
   @Get(':id')
   getProfile(@Param('id', ParseUUIDPipe) id: UUID) {
     try {
@@ -49,11 +59,6 @@ export class ProfileController {
         message: 'Not Found: Profile not found',
       });
     }
-  }
-
-  @Get()
-  getAllProfiles(@Query() query: GetAllProfileQueryDto) {
-    return this.profileService.getAllProfiles(query);
   }
 
   @Delete(':id')
