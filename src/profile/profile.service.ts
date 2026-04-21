@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   AgifyResponse,
   CountryResponse,
@@ -193,6 +193,21 @@ export class ProfileService {
     const minAge = parseAboveValue(raw);
     const maxAge = parseBelowValue(raw);
     const fromCountry = parseFromCountry(raw);
+
+    const hasFilter =
+      genderMatch !== null ||
+      ageGroupMatch !== null ||
+      ageLimits !== null ||
+      minAge !== null ||
+      maxAge !== null ||
+      fromCountry !== null;
+
+    if (!hasFilter) {
+      throw new HttpException(
+        { status: 'error', message: 'Unable to interpret query' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     if (minAge != null) {
       qb.andWhere('p.age >= :min_age', { min_age: minAge });

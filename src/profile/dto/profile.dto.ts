@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsInt,
+  IsNotEmpty,
   Min,
   Max,
 } from 'class-validator';
@@ -72,6 +73,7 @@ export class GetAllProfileQueryDto {
 
 export class SearchProfileDto {
   @IsString()
+  @IsNotEmpty()
   q: string;
 
   @IsOptional()

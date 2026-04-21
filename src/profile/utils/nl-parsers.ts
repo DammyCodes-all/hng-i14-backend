@@ -28,24 +28,28 @@ export function parseFromCountry(
 ): FromCountryResult {
   if (!text) return null;
 
-  // capture the token(s) following 'from' (up to a reasonable length)
-  const m = text.match(/\bfrom\s+([A-Za-z][A-Za-z\s\.\-']{0,60})/i);
+  // Capture everything after "from [the]" — up to 60 characters
+  const m = text.match(/\bfrom\s+(?:the\s+)?([A-Za-z][A-Za-z\s.\-']{0,60})/i);
   if (!m) return null;
 
   let candidate = m[1].trim();
 
-  // remove leading 'the' (e.g. "from the United Kingdom")
-  candidate = candidate.replace(/^\s*the\s+/i, '').trim();
+  candidate = candidate
+    .replace(
+      /\s+(?:above|below|over|under|older|younger|less|more|aged?|and|with|\d).*/i,
+      '',
+    )
+    .trim();
+
   if (!candidate) return null;
 
-  // compact (remove dots/spaces) for code detection (e.g. "U.S." -> "US")
-  const compact = candidate.replace(/[\.\s]+/g, '');
+  const compact = candidate.replace(/[\s.]+/g, '');
 
-  // if compact is 2-3 letters, treat as country code
-  if (/^[A-Za-z]{2,3}$/.test(compact)) {
+  // 2 pure letters → treat as ISO country code
+  if (/^[A-Za-z]{2}$/.test(compact)) {
     return { country_id: compact.toUpperCase() };
   }
 
-  // otherwise return the lowercased candidate string for LIKE matching
+  // Longer string → return lowercased name for LIKE matching
   return { country_name: candidate.toLowerCase() };
 }
