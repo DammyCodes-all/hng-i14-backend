@@ -5,7 +5,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
-import { parseBelowValue, parseFromCountry } from './utils/nl-parsers';
+import {
+  parseAboveValue,
+  parseBelowValue,
+  parseFromCountry,
+} from './utils/nl-parsers';
 import { fetchGender, fetchAge, fetchNation } from './utils/fetchers';
 
 // just a test for wakatime
