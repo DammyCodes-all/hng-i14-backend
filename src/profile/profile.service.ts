@@ -1,22 +1,14 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import {
-  AgifyResponse,
-  CountryResponse,
-  GenderizeResponse,
-  Profile,
-} from 'src/types';
+import { Profile } from 'src/types';
 import { UUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
-import {
-  parseAboveValue,
-  parseBelowValue,
-  parseFromCountry,
-} from './utils/nl-parsers';
+import { parseBelowValue, parseFromCountry } from './utils/nl-parsers';
 import { fetchGender, fetchAge, fetchNation } from './utils/fetchers';
 
+// just a test for wakatime
 // eslint-disable @typescript-eslint/no-unsafe-assignment
 @Injectable()
 export class ProfileService {
