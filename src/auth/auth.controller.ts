@@ -55,11 +55,6 @@ export class AuthController {
       throw new UnauthorizedException('Missing OAuth callback parameters');
     }
 
-    const result = await this.authService.completeGithubCallback({
-      code,
-      state,
-    });
-
     const modeFromCallBack = this.authService.peekTransactionMode(state);
 
     if (modeFromCallBack === 'cli') {
@@ -67,6 +62,11 @@ export class AuthController {
         `http://localhost:9876?code=${code}&state=${state}`,
       );
     }
+
+    const result = await this.authService.completeGithubCallback({
+      code,
+      state,
+    });
 
     const callbackMode = mode ?? result.mode;
 
