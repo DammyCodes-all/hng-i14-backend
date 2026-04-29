@@ -5,9 +5,18 @@ import {
 } from '@nestjs/common';
 import { UserEntity } from 'src/users/user.entity';
 import { UserService } from 'src/users/user.service';
+import { AppConfigService } from 'src/config/app-config.service';
 import { Request } from 'express';
-import { AUTH_COOKIE_NAME, AUTH_REFRESH_COOKIE_NAME, AUTH_PKCE_TRANSACTION_TTL_MS, getAuthEnv } from './auth.config';
-import { buildGithubAuthUrl, generatePkcePair, generateState } from './pkce.util';
+import {
+  AUTH_COOKIE_NAME,
+  AUTH_REFRESH_COOKIE_NAME,
+  AUTH_PKCE_TRANSACTION_TTL_MS,
+} from './auth.config';
+import {
+  buildGithubAuthUrl,
+  generatePkcePair,
+  generateState,
+} from './pkce.util';
 import { TokenService } from './token.service';
 
 type AuthMode = 'web' | 'cli';
@@ -34,18 +43,25 @@ interface GithubEmailPayload {
 
 @Injectable()
 export class AuthService {
-  private readonly githubTransactions = new Map<string, GithubLoginTransaction>();
+  private readonly githubTransactions = new Map<
+    string,
+    GithubLoginTransaction
+  >();
 
   constructor(
     private readonly userService: UserService,
     private readonly tokenService: TokenService,
+    private readonly configService: AppConfigService,
   ) {}
 
   private cleanupExpiredTransactions(): void {
     const now = Date.now();
 
     for (const [state, transaction] of this.githubTransactions.entries()) {
-      if (now - transaction.createdAt.getTime() > AUTH_PKCE_TRANSACTION_TTL_MS) {
+      if (
+        now - transaction.createdAt.getTime() >
+        AUTH_PKCE_TRANSACTION_TTL_MS
+      ) {
         this.githubTransactions.delete(state);
       }
     }
@@ -54,9 +70,9 @@ export class AuthService {
   beginGithubLogin(mode: AuthMode = 'web'): { authUrl: string; state: string } {
     this.cleanupExpiredTransactions();
 
-    const { githubClientId, backendUrl } = getAuthEnv();
-    console.log('[AuthService] beginGithubLogin - githubClientId:', githubClientId ? `${githubClientId.slice(0, 10)}...` : 'EMPTY');
-    console.log('[AuthService] beginGithubLogin - backendUrl:', backendUrl || 'EMPTY');
+    const githubClientId = this.configService.githubClientId;
+    const backendUrl = this.configService.backendUrl;
+
     if (!githubClientId || !backendUrl) {
       throw new BadRequestException('OAuth configuration is missing');
     }
@@ -97,7 +113,9 @@ export class AuthService {
     return transaction;
   }
 
-  private async fetchGithubUser(accessToken: string): Promise<GithubUserPayload> {
+  private async fetchGithubUser(
+    accessToken: string,
+  ): Promise<GithubUserPayload> {
     const response = await fetch('https://api.github.com/user', {
       headers: {
         Accept: 'application/vnd.github+json',
@@ -113,7 +131,9 @@ export class AuthService {
     return (await response.json()) as GithubUserPayload;
   }
 
-  private async fetchGithubPrimaryEmail(accessToken: string): Promise<string | null> {
+  private async fetchGithubPrimaryEmail(
+    accessToken: string,
+  ): Promise<string | null> {
     const response = await fetch('https://api.github.com/user/emails', {
       headers: {
         Accept: 'application/vnd.github+json',
@@ -127,7 +147,9 @@ export class AuthService {
     }
 
     const emails = (await response.json()) as GithubEmailPayload[];
-    return emails.find((email) => email.primary && email.verified)?.email ?? null;
+    return (
+      emails.find((email) => email.primary && email.verified)?.email ?? null
+    );
   }
 
   async completeGithubCallback(options: {
@@ -139,26 +161,31 @@ export class AuthService {
     refreshToken: string;
   }> {
     const transaction = this.consumeTransaction(options.state);
-    const { githubClientId, githubClientSecret, backendUrl } = getAuthEnv();
+    const githubClientId = this.configService.githubClientId;
+    const githubClientSecret = this.configService.githubClientSecret;
+    const backendUrl = this.configService.backendUrl;
 
     if (!githubClientId || !githubClientSecret || !backendUrl) {
       throw new BadRequestException('OAuth configuration is missing');
     }
 
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
+    const tokenResponse = await fetch(
+      'https://github.com/login/oauth/access_token',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: githubClientId,
+          client_secret: githubClientSecret,
+          code: options.code,
+          code_verifier: transaction.codeVerifier,
+          redirect_uri: `${backendUrl.replace(/\/$/, '')}/auth/github/callback`,
+        }),
       },
-      body: new URLSearchParams({
-        client_id: githubClientId,
-        client_secret: githubClientSecret,
-        code: options.code,
-        code_verifier: transaction.codeVerifier,
-        redirect_uri: `${backendUrl.replace(/\/$/, '')}/auth/github/callback`,
-      }),
-    });
+    );
 
     if (!tokenResponse.ok) {
       throw new UnauthorizedException('GitHub code exchange failed');
@@ -210,7 +237,8 @@ export class AuthService {
     accessToken: string;
     refreshToken: string;
   }> {
-    const tokenRecord = await this.tokenService.validateRefreshToken(refreshToken);
+    const tokenRecord =
+      await this.tokenService.validateRefreshToken(refreshToken);
 
     if (!tokenRecord) {
       throw new UnauthorizedException('Refresh token is invalid or expired');
@@ -273,7 +301,10 @@ export class AuthService {
     return cookies[AUTH_COOKIE_NAME] ?? null;
   }
 
-  getRefreshTokenFromRequest(request: Request, bodyToken?: string): string | null {
+  getRefreshTokenFromRequest(
+    request: Request,
+    bodyToken?: string,
+  ): string | null {
     if (bodyToken) {
       return bodyToken;
     }
