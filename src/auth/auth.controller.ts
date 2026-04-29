@@ -11,6 +11,7 @@ import {
 import type { Request, Response } from 'express';
 import { AUTH_COOKIE_NAME, AUTH_REFRESH_COOKIE_NAME } from './auth.config';
 import { AuthService } from './auth.service';
+import { Throttle } from '@nestjs/throttler';
 
 function cookieOptions(maxAge: number) {
   return {
@@ -27,6 +28,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Get('github')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async beginGithubLogin(
     @Query('mode') mode: 'web' | 'cli' | undefined,
     @Res() response: Response,
@@ -36,6 +38,7 @@ export class AuthController {
   }
 
   @Get('github/callback')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async completeGithubCallback(
     @Query('code') code: string | undefined,
     @Query('state') state: string | undefined,
@@ -84,6 +87,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async refreshSession(
     @Body('refresh_token') refreshToken: string | undefined,
     @Req() request: Request,
@@ -128,6 +132,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async logout(
     @Body('refresh_token') refreshToken: string | undefined,
     @Req() request: Request,
@@ -153,6 +158,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   getMe(@Req() request: Request) {
     const token = this.authService.getTokenFromRequest(request);
     if (!token) {
