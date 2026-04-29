@@ -12,7 +12,10 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   app.enableCors({
-    origin: ['http://localhost:5173'],
+    origin: [
+      'http://localhost:5173',
+      'https://insighta-web-portal-ten.vercel.app',
+    ],
     credentials: true,
   });
 
