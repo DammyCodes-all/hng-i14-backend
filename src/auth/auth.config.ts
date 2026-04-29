@@ -19,7 +19,9 @@ export const getAuthEnv = () => ({
 export const logAuthEnv = () => {
   const env = getAuthEnv();
   console.log('[AuthConfig] Environment variables:', {
-    githubClientId: env.githubClientId ? `${env.githubClientId.slice(0, 10)}...` : 'MISSING',
+    githubClientId: env.githubClientId
+      ? `${env.githubClientId.slice(0, 10)}...`
+      : 'MISSING',
     githubClientSecret: env.githubClientSecret ? 'SET' : 'MISSING',
     jwtSecret: env.jwtSecret ? 'SET' : 'MISSING',
     frontendUrl: env.frontendUrl || 'MISSING',
