@@ -140,7 +140,10 @@ export class ProfileService {
     };
   }
 
-  async naturalLanguageSearch(queryObj: SearchProfileDto) {
+  async naturalLanguageSearch(
+    queryObj: SearchProfileDto,
+    baseUrl: string = 'placeholder',
+  ) {
     const { q, page, limit } = queryObj;
     const raw = q || '';
     const query = raw.toLowerCase();
@@ -250,7 +253,7 @@ export class ProfileService {
       limit: limit ?? 10,
       total,
       data: profiles,
-      baseUrl: 'placeholder',
+      baseUrl,
       queryParams: { q },
     });
   }
