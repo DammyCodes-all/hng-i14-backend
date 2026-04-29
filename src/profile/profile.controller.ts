@@ -11,16 +11,21 @@ import {
   NotFoundException,
   HttpException,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import type { UUID } from 'crypto';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
+import { ActiveUserGuard, ApiVersionGuard, JwtGuard, RolesGuard } from 'src/auth/guards';
+import { Roles } from 'src/auth/decorators';
 
+@UseGuards(JwtGuard, ActiveUserGuard, ApiVersionGuard, RolesGuard)
 @Controller('api/profiles')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
   @Post()
+  @Roles('admin')
   async createProfile(@Body() createProfileDto: { name: string }) {
     if (typeof createProfileDto.name !== 'string') {
       throw new HttpException(
@@ -39,16 +44,19 @@ export class ProfileController {
   }
 
   @Get('search')
+  @Roles('admin', 'analyst')
   searchProfiles(@Query() query: SearchProfileDto) {
     return this.profileService.naturalLanguageSearch(query);
   }
 
   @Get()
+  @Roles('admin', 'analyst')
   getAllProfiles(@Query() query: GetAllProfileQueryDto) {
     return this.profileService.getAllProfiles(query);
   }
 
   @Get(':id')
+  @Roles('admin', 'analyst')
   getProfile(@Param('id', ParseUUIDPipe) id: UUID) {
     try {
       return this.profileService.getProfile(id);
@@ -63,6 +71,7 @@ export class ProfileController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('admin')
   deleteProfile(@Param('id', ParseUUIDPipe) id: UUID) {
     return this.profileService.deleteProfile(id);
   }
