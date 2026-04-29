@@ -17,7 +17,7 @@ function cookieOptions(maxAge: number) {
   const isProd = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    sameSite: (isProd ? 'none' : 'lax') as const,
+    sameSite: isProd ? 'none' : 'lax',
     secure: isProd, // SameSite=None requires Secure in browsers
     path: '/',
     maxAge,
@@ -44,7 +44,10 @@ export class AuthController {
       }
     }
 
-    const result = this.authService.beginGithubLogin(mode ?? 'web', redirectUri);
+    const result = this.authService.beginGithubLogin(
+      mode ?? 'web',
+      redirectUri,
+    );
 
     if (mode === 'cli') {
       response.status(200).json(result);
