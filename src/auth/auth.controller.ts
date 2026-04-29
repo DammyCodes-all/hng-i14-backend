@@ -33,8 +33,14 @@ export class AuthController {
     @Query('mode') mode: 'web' | 'cli' | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const { authUrl } = this.authService.beginGithubLogin(mode ?? 'web');
-    response.redirect(authUrl);
+    const result = this.authService.beginGithubLogin(mode ?? 'web');
+
+    if (mode === 'cli') {
+      response.status(200).json(result);
+      return;
+    }
+
+    response.redirect(result.authUrl);
   }
 
   @Get('github/callback')
@@ -53,6 +59,14 @@ export class AuthController {
       code,
       state,
     });
+
+    const modeFromCallBack = this.authService.peekTransactionMode(state);
+
+    if (modeFromCallBack === 'cli') {
+      return response.redirect(
+        `http://localhost:9876?code=${code}&state=${state}`,
+      );
+    }
 
     const callbackMode = mode ?? result.mode;
 
@@ -86,6 +100,21 @@ export class AuthController {
         refresh_token: result.refreshToken,
       },
     });
+  }
+
+  @Post('github/cli-exchange')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async cliExchange(@Body() body: { code: string; state: string }) {
+    const result = await this.authService.completeGithubCallback(body);
+
+    return {
+      status: 'success',
+      data: {
+        access_token: result.accessToken,
+        refresh_token: result.refreshToken,
+        user: result.user,
+      },
+    };
   }
 
   @Post('refresh')

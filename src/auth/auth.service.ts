@@ -152,6 +152,10 @@ export class AuthService {
     );
   }
 
+  peekTransactionMode(state: string): AuthMode | undefined {
+    return this.githubTransactions.get(state)?.mode;
+  }
+
   async completeGithubCallback(options: {
     code: string;
     state: string;
