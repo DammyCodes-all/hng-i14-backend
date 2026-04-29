@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
+import { PaginatedResponse } from './dto/pagination.dto';
 import {
   parseAboveValue,
   parseBelowValue,
@@ -12,7 +13,6 @@ import {
 } from './utils/nl-parsers';
 import { fetchGender, fetchAge, fetchNation } from './utils/fetchers';
 
-// just a test for wakatime
 // eslint-disable @typescript-eslint/no-unsafe-assignment
 @Injectable()
 export class ProfileService {
@@ -140,7 +140,10 @@ export class ProfileService {
     };
   }
 
-  async naturalLanguageSearch(queryObj: SearchProfileDto) {
+  async naturalLanguageSearch(
+    queryObj: SearchProfileDto,
+    baseUrl: string = 'placeholder',
+  ) {
     const { q, page, limit } = queryObj;
     const raw = q || '';
     const query = raw.toLowerCase();
@@ -245,16 +248,20 @@ export class ProfileService {
       created_at: e.created_at.toISOString(),
     }));
 
-    return {
-      status: 'success',
+    return new PaginatedResponse({
+      page: page ?? 1,
+      limit: limit ?? 10,
       total,
-      page,
-      limit,
       data: profiles,
-    };
+      baseUrl,
+      queryParams: { q },
+    });
   }
 
-  async getAllProfiles(query: GetAllProfileQueryDto) {
+  async getAllProfiles(
+    query: GetAllProfileQueryDto,
+    baseUrl: string = 'placeholder',
+  ) {
     const {
       gender,
       country_id,
@@ -322,13 +329,132 @@ export class ProfileService {
       created_at: e.created_at.toISOString(),
     }));
 
-    return {
-      status: 'success',
+    return new PaginatedResponse({
+      page: page ?? 1,
+      limit: limit ?? 10,
       total,
-      page,
-      limit,
       data: profiles,
-    };
+      baseUrl,
+      queryParams: {
+        gender,
+        country_id,
+        age_group,
+        min_age,
+        max_age,
+        min_gender_probability,
+        min_country_probability,
+        sort_by,
+        order,
+      },
+    });
+  }
+
+  async getAllProfilesForCsv(query: GetAllProfileQueryDto): Promise<Profile[]> {
+    const {
+      gender,
+      country_id,
+      age_group,
+      min_age,
+      max_age,
+      min_gender_probability,
+      min_country_probability,
+      sort_by,
+      order,
+    } = query;
+
+    const qb = this.profileRepository.createQueryBuilder('p');
+
+    if (gender)
+      qb.andWhere('LOWER(p.gender) = :gender', {
+        gender: gender.toLowerCase(),
+      });
+    if (country_id)
+      qb.andWhere('UPPER(p.country_id) = :country_id', {
+        country_id: country_id.toUpperCase(),
+      });
+    if (age_group)
+      qb.andWhere('LOWER(p.age_group) = :age_group', {
+        age_group: age_group.toLowerCase(),
+      });
+
+    if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
+    if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
+
+    if (min_gender_probability != null)
+      qb.andWhere('p.gender_probability >= :mgp', {
+        mgp: min_gender_probability,
+      });
+
+    if (min_country_probability != null)
+      qb.andWhere('p.country_probability >= :mcp', {
+        mcp: min_country_probability,
+      });
+
+    if (sort_by) {
+      const direction =
+        (order || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+      qb.orderBy(`p.${sort_by}`, direction);
+    }
+
+    const entities = await qb.getMany();
+
+    return entities.map((e) => ({
+      id: e.id,
+      name: e.name,
+      gender: e.gender ?? null,
+      gender_probability: e.gender_probability ?? null,
+      age: e.age ?? null,
+      age_group: e.age_group ?? null,
+      country_id: e.country_id ?? null,
+      country_name: e.country_name ?? null,
+      country_probability: e.country_probability ?? null,
+      created_at: e.created_at.toISOString(),
+    }));
+  }
+
+  generateCsv(profiles: Profile[]): string {
+    const headers = [
+      'id',
+      'name',
+      'gender',
+      'gender_probability',
+      'age',
+      'age_group',
+      'country_id',
+      'country_name',
+      'country_probability',
+      'created_at',
+    ];
+
+    const rows = profiles.map((profile) => [
+      profile.id,
+      profile.name,
+      profile.gender ?? '',
+      profile.gender_probability ?? '',
+      profile.age ?? '',
+      profile.age_group ?? '',
+      profile.country_id ?? '',
+      profile.country_name ?? '',
+      profile.country_probability ?? '',
+      profile.created_at,
+    ]);
+
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) =>
+        row
+          .map((cell) => {
+            const cellStr = String(cell);
+            if (cellStr.includes(',') || cellStr.includes('"')) {
+              return `"${cellStr.replace(/"/g, '""')}"`;
+            }
+            return cellStr;
+          })
+          .join(','),
+      ),
+    ].join('\n');
+
+    return csv;
   }
 
   async deleteProfile(id: UUID) {
