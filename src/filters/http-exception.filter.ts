@@ -6,12 +6,21 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ThrottlerException } from '@nestjs/throttler';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+
+    if (exception instanceof ThrottlerException) {
+      response.status(HttpStatus.TOO_MANY_REQUESTS).json({
+        status: 'error',
+        message: 'Too many requests',
+      });
+      return;
+    }
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();

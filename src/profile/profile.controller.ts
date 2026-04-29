@@ -14,6 +14,7 @@ import {
   UseGuards,
   Req,
   StreamableFile,
+  BadRequestException,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ProfileService } from './profile.service';
@@ -48,17 +49,28 @@ export class ProfileController {
 
   @Get('search')
   @Roles('admin', 'analyst')
-  searchProfiles(@Query() query: SearchProfileDto) {
-    return this.profileService.naturalLanguageSearch(query);
+  searchProfiles(@Query() query: SearchProfileDto, @Req() req: Request) {
+    const baseUrl = `${req.protocol}://${req.get('host')}${req.path}`;
+    return this.profileService.naturalLanguageSearch(query, baseUrl);
   }
 
   @Get('export')
   @Roles('admin', 'analyst')
-  async exportProfiles(@Query() query: GetAllProfileQueryDto): Promise<StreamableFile> {
+  async exportProfiles(
+    @Query() query: GetAllProfileQueryDto,
+    @Query('format') format?: string,
+  ): Promise<StreamableFile> {
+    if (format !== 'csv') {
+      throw new BadRequestException({
+        status: 'error',
+        message: 'Only format=csv is supported',
+      });
+    }
+
     const profiles = await this.profileService.getAllProfilesForCsv(query);
     const csv = this.profileService.generateCsv(profiles);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    
+
     const buffer = Buffer.from(csv, 'utf-8');
     return new StreamableFile(buffer, {
       type: 'text/csv',
