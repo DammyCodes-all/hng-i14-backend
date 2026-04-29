@@ -55,6 +55,8 @@ export class AuthService {
     this.cleanupExpiredTransactions();
 
     const { githubClientId, backendUrl } = getAuthEnv();
+    console.log('[AuthService] beginGithubLogin - githubClientId:', githubClientId ? `${githubClientId.slice(0, 10)}...` : 'EMPTY');
+    console.log('[AuthService] beginGithubLogin - backendUrl:', backendUrl || 'EMPTY');
     if (!githubClientId || !backendUrl) {
       throw new BadRequestException('OAuth configuration is missing');
     }
