@@ -31,9 +31,19 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async beginGithubLogin(
     @Query('mode') mode: 'web' | 'cli' | undefined,
+    @Query('redirect_uri') redirectUriEncoded: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const result = this.authService.beginGithubLogin(mode ?? 'web');
+    let redirectUri: string | undefined;
+    if (redirectUriEncoded) {
+      try {
+        redirectUri = decodeURIComponent(redirectUriEncoded);
+      } catch {
+        redirectUri = redirectUriEncoded;
+      }
+    }
+
+    const result = this.authService.beginGithubLogin(mode ?? 'web', redirectUri);
 
     if (mode === 'cli') {
       response.status(200).json(result);
@@ -91,6 +101,10 @@ export class AuthController {
       result.refreshToken,
       cookieOptions(5 * 60 * 1000),
     );
+
+    if (result.redirectUri) {
+      return response.redirect(result.redirectUri);
+    }
 
     return response.status(200).json({
       status: 'success',

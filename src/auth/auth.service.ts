@@ -26,6 +26,7 @@ interface GithubLoginTransaction {
   codeVerifier: string;
   createdAt: Date;
   mode: AuthMode;
+  redirectUri?: string | null;
 }
 
 interface GithubUserPayload {
@@ -67,7 +68,10 @@ export class AuthService {
     }
   }
 
-  beginGithubLogin(mode: AuthMode = 'web'): { authUrl: string; state: string } {
+  beginGithubLogin(
+    mode: AuthMode = 'web',
+    redirectUri?: string | null,
+  ): { authUrl: string; state: string } {
     this.cleanupExpiredTransactions();
 
     const githubClientId = this.configService.githubClientId;
@@ -85,6 +89,7 @@ export class AuthService {
       codeVerifier,
       createdAt: new Date(),
       mode,
+      redirectUri: redirectUri ?? null,
     });
 
     return {
@@ -161,6 +166,7 @@ export class AuthService {
     state: string;
   }): Promise<{
     mode: AuthMode;
+    redirectUri?: string | null;
     user: UserEntity;
     accessToken: string;
     refreshToken: string;
@@ -232,6 +238,7 @@ export class AuthService {
 
     return {
       mode: transaction.mode,
+      redirectUri: transaction.redirectUri ?? null,
       user,
       accessToken,
       refreshToken,

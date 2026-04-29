@@ -182,8 +182,6 @@ The CLI README from the separate repo stores credentials at `~/.insighta/credent
 - Profile list and search responses include pagination links, so CLI clients can page forward and backward without rebuilding query strings.
 - Search links preserve the `q` parameter and use `/api/profiles/search` as the base path.
 
-## Security rules
-
 - All `/api/*` profile routes require authentication.
 - Inactive users are rejected with `403`.
 - Profile routes use role metadata and a centralized `RolesGuard`.
