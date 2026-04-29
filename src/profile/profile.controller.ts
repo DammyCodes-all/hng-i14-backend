@@ -12,7 +12,10 @@ import {
   HttpException,
   Query,
   UseGuards,
+  Req,
+  StreamableFile,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { ProfileService } from './profile.service';
 import type { UUID } from 'crypto';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
@@ -49,10 +52,25 @@ export class ProfileController {
     return this.profileService.naturalLanguageSearch(query);
   }
 
+  @Get('export')
+  @Roles('admin', 'analyst')
+  async exportProfiles(@Query() query: GetAllProfileQueryDto): Promise<StreamableFile> {
+    const profiles = await this.profileService.getAllProfilesForCsv(query);
+    const csv = this.profileService.generateCsv(profiles);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    
+    const buffer = Buffer.from(csv, 'utf-8');
+    return new StreamableFile(buffer, {
+      type: 'text/csv',
+      disposition: `attachment; filename="profiles-${timestamp}.csv"`,
+    });
+  }
+
   @Get()
   @Roles('admin', 'analyst')
-  getAllProfiles(@Query() query: GetAllProfileQueryDto) {
-    return this.profileService.getAllProfiles(query);
+  getAllProfiles(@Query() query: GetAllProfileQueryDto, @Req() req: Request) {
+    const baseUrl = `${req.protocol}://${req.get('host')}${req.path}`;
+    return this.profileService.getAllProfiles(query, baseUrl);
   }
 
   @Get(':id')
