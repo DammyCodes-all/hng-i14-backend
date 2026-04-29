@@ -274,7 +274,14 @@ export class AuthService {
   }
 
   getCurrentUserFromAccessToken(accessToken: string) {
-    return this.tokenService.verifyAccessToken(accessToken);
+    try {
+      return this.tokenService.verifyAccessToken(accessToken);
+    } catch {
+      throw new UnauthorizedException({
+        status: 'error',
+        message: 'Unauthorized',
+      });
+    }
   }
 
   getTokenFromRequest(request: Request): string | null {
