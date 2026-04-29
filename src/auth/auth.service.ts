@@ -156,6 +156,7 @@ export class AuthService {
     code: string;
     state: string;
   }): Promise<{
+    mode: AuthMode;
     user: UserEntity;
     accessToken: string;
     refreshToken: string;
@@ -226,6 +227,7 @@ export class AuthService {
     });
 
     return {
+      mode: transaction.mode,
       user,
       accessToken,
       refreshToken,

@@ -54,7 +54,9 @@ export class AuthController {
       state,
     });
 
-    if ((mode ?? 'web') === 'cli') {
+    const callbackMode = mode ?? result.mode;
+
+    if (callbackMode === 'cli') {
       return response.status(200).json({
         status: 'success',
         data: {
