@@ -1,8 +1,12 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import type { NextFunction, Request, Response } from 'express';
+import { InjectPinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
+  constructor(@InjectPinoLogger() private readonly logger: Logger) {}
+
   use(request: Request, response: Response, next: NextFunction): void {
     const start = Date.now();
 
@@ -13,16 +17,16 @@ export class RequestLoggerMiddleware implements NestMiddleware {
         ? 'authenticated'
         : 'anonymous';
 
-      console.log(
-        JSON.stringify({
+      this.logger?.log(
+        {
           method: request.method,
           path: request.originalUrl,
           statusCode: response.statusCode,
           durationMs,
           user: userHint,
           ip: request.ip,
-          timestamp: new Date().toISOString(),
-        }),
+        },
+        'HTTP Request',
       );
     });
 

@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -12,7 +12,7 @@ import {
   ThrottlerModule,
 } from '@nestjs/throttler';
 import type { ExecutionContext } from '@nestjs/common';
-import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
+import { LoggerModule } from 'nestjs-pino';
 
 class AppThrottlerGuard extends ThrottlerGuard {
   protected async getTracker(req: Record<string, any>): Promise<string> {
@@ -31,6 +31,23 @@ class AppThrottlerGuard extends ThrottlerGuard {
 
 @Module({
   imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? 'info',
+        transport:
+          process.env.NODE_ENV === 'production'
+            ? undefined
+            : {
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  singleLine: true,
+                  ignore: 'pid,hostname,req.headers,req.remoteAddress,req.remotePort,res.headers',
+                  messageFormat: '{levelLabel} {msg}',
+                },
+              },
+      },
+    }),
     AppConfigModule,
     ThrottlerModule.forRoot({
       throttlers: [
@@ -59,8 +76,4 @@ class AppThrottlerGuard extends ThrottlerGuard {
   ],
   controllers: [AppController],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

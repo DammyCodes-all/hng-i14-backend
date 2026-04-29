@@ -2,8 +2,8 @@ import { Profile } from 'src/types';
 
 export class PaginationLinks {
   self!: string;
-  next?: string;
-  prev?: string;
+  next!: string | null;
+  prev!: string | null;
 }
 
 export class PaginatedResponse {
@@ -46,6 +46,8 @@ export class PaginatedResponse {
 
     this.links = {
       self: url.toString(),
+      next: null,
+      prev: null,
     };
 
     if (options.page < this.total_pages) {
