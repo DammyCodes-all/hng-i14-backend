@@ -3,11 +3,6 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { GlobalExceptionFilter } from './filters/http-exception.filter';
 import { Logger } from 'nestjs-pino';
-import { AppConfigService } from './config/app-config.service';
-
-function normalizeOrigin(value: string): string {
-  return new URL(value).origin;
-}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -16,23 +11,11 @@ async function bootstrap() {
 
   app.useLogger(app.get(Logger));
 
-  const config = app.get(AppConfigService);
-  const allowedOrigins = new Set<string>([
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://insighta-web-portal-ten.vercel.app',
-  ]);
-
-  if (config.webPortalUrl) {
-    allowedOrigins.add(normalizeOrigin(config.webPortalUrl));
-  }
-
-  if (config.backendUrl) {
-    allowedOrigins.add(normalizeOrigin(config.backendUrl));
-  }
-
   app.enableCors({
-    origin: Array.from(allowedOrigins),
+    origin: [
+      'http://localhost:5173',
+      'https://insighta-web-portal-ten.vercel.app',
+    ],
     credentials: true,
   });
 
