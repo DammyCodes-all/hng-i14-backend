@@ -14,10 +14,11 @@ import { AuthService } from './auth.service';
 import { Throttle } from '@nestjs/throttler';
 
 function cookieOptions(maxAge: number) {
+  const isProd = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    sameSite: 'strict' as const,
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: (isProd ? 'none' : 'lax') as const,
+    secure: isProd, // SameSite=None requires Secure in browsers
     path: '/',
     maxAge,
   };
