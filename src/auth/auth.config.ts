@@ -1,7 +1,9 @@
 export const AUTH_ACCESS_TOKEN_TTL_MS = 3 * 60 * 1000;
 export const AUTH_REFRESH_TOKEN_TTL_MS = 5 * 60 * 1000;
+export const AUTH_PKCE_TRANSACTION_TTL_MS = 10 * 60 * 1000;
 
 export const AUTH_COOKIE_NAME = 'insighta_session';
+export const AUTH_REFRESH_COOKIE_NAME = 'insighta_refresh';
 
 export const DEFAULT_USER_ROLE = 'analyst' as const;
 export const INITIAL_USER_ROLE = 'admin' as const;
