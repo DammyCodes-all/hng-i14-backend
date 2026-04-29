@@ -127,6 +127,61 @@ Because schema synchronization is enabled, tables are created or updated on star
 
 The first authenticated user is promoted to `admin`; later users default to `analyst`.
 
+## CLI integration
+
+The backend is compatible with the Insighta CLI flow and exposes the same auth and profile APIs used by the browser client.
+
+### CLI auth flow
+
+1. The CLI starts login with `GET /auth/github?mode=cli`.
+2. The backend creates the OAuth state, PKCE verifier, and GitHub authorization URL.
+3. The CLI opens the returned authorization URL in the browser.
+4. GitHub redirects back to `GET /auth/github/callback`.
+5. When the request is in CLI mode, the callback returns JSON with `access_token`, `refresh_token`, and `user` data.
+6. The CLI stores credentials locally, in `~/.insighta/credentials.json`.
+
+### CLI commands supported by this backend
+
+- `insighta login` - starts the GitHub OAuth flow and saves tokens.
+- `insighta logout` - revokes the refresh token and clears local credentials.
+- `insighta whoami` - fetches the current access-token identity from `GET /auth/me`.
+- `insighta profiles list` - calls `GET /api/profiles` with filters, pagination, and sorting.
+- `insighta profiles search` - calls `GET /api/profiles/search?q=...` for natural-language queries.
+- `insighta profiles get <id>` - calls `GET /api/profiles/:id`.
+- `insighta profiles create --name <name>` - calls `POST /api/profiles`.
+- `insighta profiles export` - calls `GET /api/profiles/export?format=csv`.
+
+### CLI credential model
+
+- Access tokens are short lived and expire after 3 minutes.
+- Refresh tokens are used to obtain new access and refresh tokens through `POST /auth/refresh`.
+- CLI requests should send the access token in the `Authorization: Bearer <token>` header.
+- CLI profile requests must also send `X-API-Version: 1`.
+
+### CLI storage convention
+
+The CLI README from the separate repo stores credentials at `~/.insighta/credentials.json`. A compatible file can include:
+
+```json
+{
+  "access_token": "jwt_token",
+  "refresh_token": "jwt_token",
+  "api_url": "http://localhost:8000",
+  "user": {
+    "id": "uuid",
+    "username": "github_username",
+    "role": "admin"
+  }
+}
+```
+
+### CLI compatibility notes
+
+- The backend already supports `mode=cli` on `/auth/github` and `/auth/github/callback`.
+- The CLI should treat the callback response as JSON and persist the returned tokens.
+- Profile list and search responses include pagination links, so CLI clients can page forward and backward without rebuilding query strings.
+- Search links preserve the `q` parameter and use `/api/profiles/search` as the base path.
+
 ## Security rules
 
 - All `/api/*` profile routes require authentication.
