@@ -1,0 +1,54 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      GITHUB_CLIENT_ID: ci-client-id
+      GITHUB_CLIENT_SECRET: ci-client-secret
+      JWT_ACCESS_SECRET: ci-jwt-access-secret
+      JWT_REFRESH_SECRET: ci-jwt-refresh-secret
+      BACKEND_URL: http://localhost:3000
+      WEB_PORTAL_URL: http://localhost:5173
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm exec eslint "src/**/*.ts" "test/**/*.ts"
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run e2e tests
+        run: pnpm exec jest --config ./test/jest-e2e.json --runInBand
