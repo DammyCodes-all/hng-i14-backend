@@ -223,6 +223,7 @@ export class AuthController {
         role: claims.role,
         github_id: claims.githubId,
         username: claims.username,
+        avatar_url: claims.avatarUrl,
       },
     };
   }
