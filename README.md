@@ -449,13 +449,13 @@ test/
 
 ## Seeding
 
-Seed data is stored in `seed/seed_profiles.json` and can be loaded with:
+Seed data is stored in `seed/seed_profiles.json` and `seed/seed_users.json` and can be loaded with:
 
 ```bash
 node scripts/seed.js
 ```
 
-The seed script skips duplicates by name.
+The seed script skips duplicate profiles by name and duplicate users by GitHub ID.
 
 ## Notes for contributors
 

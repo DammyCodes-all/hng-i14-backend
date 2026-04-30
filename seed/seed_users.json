@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "github_id": "seed-analyst-001",
+      "username": "seed.analyst",
+      "email": "seed.analyst@example.com",
+      "avatar_url": null,
+      "role": "analyst",
+      "is_active": true
+    }
+  ]
+}
