@@ -7,7 +7,7 @@ import {
 } from 'typeorm';
 
 @Entity('profiles')
-@Index('IDX_profiles_name', ['name'], { unique: true })
+@Index('IDX_profiles_name', ['name'])
 @Index('IDX_profiles_country_id', ['country_id'])
 @Index('IDX_profiles_country_name', ['country_name'])
 @Index('IDX_profiles_gender', ['gender'])
