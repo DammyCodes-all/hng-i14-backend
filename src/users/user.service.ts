@@ -33,6 +33,9 @@ export class UserService {
     const existing = await this.findByGithubId(profile.github_id);
 
     if (existing) {
+      if (!existing.created_at) {
+        existing.created_at = new Date();
+      }
       existing.username = profile.username;
       existing.email = profile.email ?? null;
       existing.avatar_url = profile.avatar_url ?? null;
@@ -52,6 +55,7 @@ export class UserService {
       role,
       is_active: true,
       last_login_at: new Date(),
+      created_at: new Date(),
     });
 
     return await this.userRepository.save(entity);
