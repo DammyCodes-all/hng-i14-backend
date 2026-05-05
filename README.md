@@ -1,11 +1,11 @@
 # HNG i14 Backend
 
-NestJS backend for the Profile Intelligence System. It enriches submitted names with demographic predictions, stores profiles in SQLite, and now includes Stage 3 auth, RBAC, pagination links, CSV export, rate limiting, and request logging.
+NestJS backend for the Profile Intelligence System. It enriches submitted names with demographic predictions, stores profiles in PostgreSQL, and now includes Stage 3 auth, RBAC, pagination links, CSV export/import, rate limiting, and request logging.
 
 ## What this repo does
 
 - Enriches a name with predicted gender, age, and country data.
-- Persists profiles in SQLite through TypeORM.
+- Persists profiles in PostgreSQL through TypeORM.
 - Supports GitHub OAuth with PKCE for browser and CLI clients.
 - Issues short-lived access tokens and rotating refresh tokens.
 - Enforces role-based access control on `/api/*` profile routes.
@@ -17,7 +17,7 @@ NestJS backend for the Profile Intelligence System. It enriches submitted names 
 - NestJS 11
 - TypeScript 5.7
 - TypeORM 0.3
-- SQLite via `better-sqlite3`
+- PostgreSQL via `pg`
 - `jsonwebtoken` for access tokens
 - `@nestjs/config` for env management
 - `@nestjs/throttler` for rate limiting
@@ -35,7 +35,7 @@ NestJS app
   ├─ AuthModule      -> OAuth, JWT, refresh tokens, RBAC support
   ├─ ProfileModule   -> profile CRUD, search, export
   ├─ UsersModule     -> GitHub-backed user records and role assignment
-  └─ TypeORM         -> SQLite database at db/database.db
+  └─ TypeORM         -> PostgreSQL via `DATABASE_URL`
 ```
 
 ## Prerequisites
@@ -96,11 +96,11 @@ Other scripts:
 
 ## Data storage
 
-- Database file: `db/database.db`
-- ORM behavior: `synchronize: true`
+- Database: PostgreSQL
+- ORM behavior: `synchronize: false`
 - Entities are auto-loaded by TypeORM
 
-Because schema synchronization is enabled, tables are created or updated on startup instead of through migrations.
+Schema repair for timestamp columns runs at application bootstrap so the auth and token tables keep their defaults even if the database starts in a partially migrated state.
 
 ## Authentication overview
 

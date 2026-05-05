@@ -35,6 +35,8 @@ export class ProfileImportService {
       let total = 0;
       let inserted = 0;
       let skipped = 0;
+      let encounteredError = false;
+      let errorMessage: string | null = null;
 
       const reasons: Record<string, number> = {} as Record<string, number>;
 
@@ -98,6 +100,27 @@ export class ProfileImportService {
         }
       };
 
+      const finalize = async () => {
+        try {
+          await flushBatch();
+
+          resolve({
+            status: encounteredError ? 'partial' : 'success',
+            total_rows: total,
+            inserted,
+            skipped,
+            reasons: errorMessage
+              ? {
+                  ...reasons,
+                  stream_error: (reasons.stream_error || 0) + 1,
+                }
+              : reasons,
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+
       parser.on('headers', (headers: string[]) => {
         headerCount = headers.length;
       });
@@ -150,23 +173,22 @@ export class ProfileImportService {
       });
 
       parser.on('error', (err) => {
+        encounteredError = true;
+        errorMessage = err instanceof Error ? err.message : String(err);
+        skipped += batch.length;
+        if (batch.length > 0) {
+          reasons['malformed_row'] =
+            (reasons['malformed_row'] || 0) + batch.length;
+          batch.length = 0;
+        }
+
         this.logger.error('CSV parse error', err.stack || err);
-        reject(err);
+
+        finalize().catch(reject);
       });
 
-      parser.on('end', async () => {
-        try {
-          await flushBatch();
-          resolve({
-            status: 'success',
-            total_rows: total,
-            inserted,
-            skipped,
-            reasons,
-          });
-        } catch (err) {
-          reject(err);
-        }
+      parser.on('end', () => {
+        finalize().catch(reject);
       });
 
       input.pipe(parser as any);
