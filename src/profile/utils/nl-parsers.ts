@@ -3,6 +3,15 @@ export type FromCountryResult = {
   country_name?: string;
 } | null;
 
+function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+    .trim();
+}
+
 export function parseAboveValue(
   text: string | undefined | null,
 ): number | null {
@@ -50,6 +59,6 @@ export function parseFromCountry(
     return { country_id: compact.toUpperCase() };
   }
 
-  // Longer string → return lowercased name for LIKE matching
-  return { country_name: candidate.toLowerCase() };
+  // Longer string → return title-cased name to match stored country names
+  return { country_name: toTitleCase(candidate) };
 }

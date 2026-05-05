@@ -225,7 +225,7 @@ export class ProfileService {
         const cidParam = fromCountry.country_id.toUpperCase();
         qb.andWhere('p.country_id = :country_id', { country_id: cidParam });
       } else if (fromCountry.country_name) {
-        const nameParam = fromCountry.country_name.toLowerCase();
+        const nameParam = fromCountry.country_name;
         qb.andWhere('p.country_name = :country_name', {
           country_name: nameParam,
         });
