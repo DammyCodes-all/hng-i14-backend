@@ -26,7 +26,7 @@ export class RefreshTokenEntity {
   @Column({ type: 'timestamptz' })
   expires_at!: Date;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 
   @UpdateDateColumn({ type: 'timestamptz' })
