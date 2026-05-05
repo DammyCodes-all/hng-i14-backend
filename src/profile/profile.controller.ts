@@ -15,18 +15,54 @@ import {
   Req,
   StreamableFile,
   BadRequestException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfileService } from './profile.service';
+import { ProfileImportService } from './profile-import.service';
 import type { UUID } from 'crypto';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
-import { ActiveUserGuard, ApiVersionGuard, JwtGuard, RolesGuard } from 'src/auth/guards';
+import {
+  ActiveUserGuard,
+  ApiVersionGuard,
+  JwtGuard,
+  RolesGuard,
+} from 'src/auth/guards';
 import { Roles } from 'src/auth/decorators';
+import { Readable } from 'stream';
 
 @UseGuards(JwtGuard, ActiveUserGuard, ApiVersionGuard, RolesGuard)
 @Controller('api/profiles')
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(
+    private readonly profileService: ProfileService,
+    private readonly profileImportService: ProfileImportService,
+  ) {}
+
+  @Post('import')
+  @Roles('admin')
+  @UseInterceptors(FileInterceptor('file'))
+  async importCsv(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException({
+        status: 'error',
+        message: 'Missing file. Please upload a CSV file as form field `file`.',
+      });
+    }
+
+    if (!file.originalname.endsWith('.csv') && file.mimetype !== 'text/csv') {
+      throw new BadRequestException({
+        status: 'error',
+        message: 'Only CSV files are accepted',
+      });
+    }
+
+    const stream = Readable.from(file.buffer);
+
+    return await this.profileImportService.importCsvStream(stream);
+  }
 
   @Post()
   @Roles('admin')
