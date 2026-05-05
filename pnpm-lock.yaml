@@ -35,6 +35,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.10
         version: 9.0.10
+      '@types/multer':
+        specifier: ^2.1.0
+        version: 2.1.0
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -53,6 +56,9 @@ importers:
       csurf:
         specifier: ^1.11.0
         version: 1.11.0
+      csv-parser:
+        specifier: ^3.2.0
+        version: 3.2.0
       fast-csv:
         specifier: ^5.0.5
         version: 5.0.5
@@ -964,6 +970,9 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
+  '@types/multer@2.1.0':
+    resolution: {integrity: sha512-zYZb0+nJhOHtPpGDb3vqPjwpdeGlGC157VpkqNQL+UU2qwoacoQ7MpsAmUptI/0Oa127X32JzWDqQVEXp2RcIA==}
+
   '@types/node@24.12.2':
     resolution: {integrity: sha512-A1sre26ke7HDIuY/M23nd9gfB+nrmhtYyMINbjI1zHJxYteKR6qSMX56FsmjMcDb3SMcjJg5BiRRgOCC/yBD0g==}
 
@@ -1668,6 +1677,11 @@ packages:
     resolution: {integrity: sha512-UCtehyEExKTxgiu8UHdGvHj4tnpE/Qctue03Giq5gPgMQ9cg/ciod5blZQ5a4uCEenNQjxyGuzygLdKUmee/bQ==}
     engines: {node: '>= 0.8.0'}
     deprecated: This package is archived and no longer maintained. For support, visit https://github.com/expressjs/express/discussions
+
+  csv-parser@3.2.0:
+    resolution: {integrity: sha512-fgKbp+AJbn1h2dcAHKIdKNSSjfp43BZZykXsCjzALjKy80VXQNHPFJ6T9Afwdzoj24aMkq8GwDS7KGcDPpejrA==}
+    engines: {node: '>= 10'}
+    hasBin: true
 
   dateformat@4.6.3:
     resolution: {integrity: sha512-2P0p0pFGzHS5EMnhdxQi7aJN+iMheud0UhG4dlE1DLAlvL8JHjJJTX/CSm4JXwV0Ka5nGk3zC5mcb5bUQUxxMA==}
@@ -4717,6 +4731,10 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
+  '@types/multer@2.1.0':
+    dependencies:
+      '@types/express': 5.0.6
+
   '@types/node@24.12.2':
     dependencies:
       undici-types: 7.16.0
@@ -5449,6 +5467,8 @@ snapshots:
       cookie-signature: 1.0.6
       csrf: 3.1.0
       http-errors: 1.7.3
+
+  csv-parser@3.2.0: {}
 
   dateformat@4.6.3: {}
 
