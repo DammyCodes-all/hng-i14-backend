@@ -13,6 +13,12 @@ import {
 } from './utils/nl-parsers';
 import { fetchGender, fetchAge, fetchNation } from './utils/fetchers';
 
+const normalizeName = (value: string): string => value.trim();
+const normalizeLower = (value: string | null | undefined): string | null =>
+  value ? value.trim().toLowerCase() : null;
+const normalizeUpper = (value: string | null | undefined): string | null =>
+  value ? value.trim().toUpperCase() : null;
+
 // eslint-disable @typescript-eslint/no-unsafe-assignment
 @Injectable()
 export class ProfileService {
@@ -24,8 +30,10 @@ export class ProfileService {
   async createProfile(createProfileDto: {
     name: string;
   }): Promise<{ status: string; data?: Profile; message?: string }> {
+    const profileName = normalizeName(createProfileDto.name);
+
     const existingEntity = await this.profileRepository.findOne({
-      where: { name: createProfileDto.name },
+      where: { name: profileName },
     });
 
     if (existingEntity) {
@@ -49,9 +57,9 @@ export class ProfileService {
     }
 
     const [genderData, ageData, nationData] = await Promise.all([
-      fetchGender(createProfileDto.name),
-      fetchAge(createProfileDto.name),
-      fetchNation(createProfileDto.name),
+      fetchGender(profileName),
+      fetchAge(profileName),
+      fetchNation(profileName),
     ]);
 
     if (!genderData) {
@@ -85,12 +93,12 @@ export class ProfileService {
     }
 
     const entity = new ProfileEntity();
-    entity.name = createProfileDto.name;
-    entity.gender = genderData.gender ?? null;
+    entity.name = profileName;
+    entity.gender = normalizeLower(genderData.gender) ?? null;
     entity.gender_probability = genderData.gender_probability ?? null;
     entity.age = ageData.age ?? null;
-    entity.age_group = ageData.age_group ?? null;
-    entity.country_id = nationData.country_id ?? null;
+    entity.age_group = normalizeLower(ageData.age_group) ?? null;
+    entity.country_id = normalizeUpper(nationData.country_id) ?? null;
     entity.country_probability = nationData.country_probability ?? null;
     entity.country_name = null;
 
@@ -174,14 +182,10 @@ export class ProfileService {
         : null;
 
     if (ageGroupMatch)
-      qb.andWhere('LOWER(p.age_group) = :age_group', {
-        age_group: ageGroupMatch,
-      });
+      qb.andWhere('p.age_group = :age_group', { age_group: ageGroupMatch });
 
     if (genderMatch)
-      qb.andWhere('LOWER(p.gender) = :gender', {
-        gender: genderMatch,
-      });
+      qb.andWhere('p.gender = :gender', { gender: genderMatch });
 
     if (ageLimits)
       qb.andWhere('p.age BETWEEN :min AND :max', {
@@ -219,12 +223,10 @@ export class ProfileService {
     if (fromCountry) {
       if (fromCountry.country_id) {
         const cidParam = fromCountry.country_id.toUpperCase();
-        qb.andWhere('UPPER(p.country_id) = :country_id', {
-          country_id: cidParam,
-        });
+        qb.andWhere('p.country_id = :country_id', { country_id: cidParam });
       } else if (fromCountry.country_name) {
-        const nameParam = `%${fromCountry.country_name.toLowerCase()}%`;
-        qb.andWhere('LOWER(p.country_name) LIKE :country_name', {
+        const nameParam = fromCountry.country_name.toLowerCase();
+        qb.andWhere('p.country_name = :country_name', {
           country_name: nameParam,
         });
       }
@@ -279,17 +281,13 @@ export class ProfileService {
     const qb = this.profileRepository.createQueryBuilder('p');
 
     if (gender)
-      qb.andWhere('LOWER(p.gender) = :gender', {
-        gender: gender.toLowerCase(),
-      });
+      qb.andWhere('p.gender = :gender', { gender: gender.toLowerCase() });
     if (country_id)
-      qb.andWhere('UPPER(p.country_id) = :country_id', {
+      qb.andWhere('p.country_id = :country_id', {
         country_id: country_id.toUpperCase(),
       });
     if (age_group)
-      qb.andWhere('LOWER(p.age_group) = :age_group', {
-        age_group: age_group.toLowerCase(),
-      });
+      qb.andWhere('p.age_group = :age_group', { age_group: age_group.toLowerCase() });
 
     if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
     if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
@@ -365,17 +363,13 @@ export class ProfileService {
     const qb = this.profileRepository.createQueryBuilder('p');
 
     if (gender)
-      qb.andWhere('LOWER(p.gender) = :gender', {
-        gender: gender.toLowerCase(),
-      });
+      qb.andWhere('p.gender = :gender', { gender: gender.toLowerCase() });
     if (country_id)
-      qb.andWhere('UPPER(p.country_id) = :country_id', {
+      qb.andWhere('p.country_id = :country_id', {
         country_id: country_id.toUpperCase(),
       });
     if (age_group)
-      qb.andWhere('LOWER(p.age_group) = :age_group', {
-        age_group: age_group.toLowerCase(),
-      });
+      qb.andWhere('p.age_group = :age_group', { age_group: age_group.toLowerCase() });
 
     if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
     if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
