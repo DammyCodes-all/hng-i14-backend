@@ -20,6 +20,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
 import { ProfileService } from './profile.service';
 import { ProfileImportService } from './profile-import.service';
 import type { UUID } from 'crypto';
@@ -31,8 +32,9 @@ import {
   RolesGuard,
 } from 'src/auth/guards';
 import { Roles } from 'src/auth/decorators';
+import { randomUUID } from 'crypto';
+import { createReadStream, promises as fsPromises } from 'fs';
 import { join } from 'path';
-import { Readable } from 'stream';
 
 @UseGuards(JwtGuard, ActiveUserGuard, ApiVersionGuard, RolesGuard)
 @Controller('api/profiles')
@@ -44,7 +46,19 @@ export class ProfileController {
 
   @Post('import')
   @Roles('admin')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: '/tmp',
+        filename: (_req, file, callback) => {
+          callback(null, `${randomUUID()}-${file.originalname}`);
+        },
+      }),
+      limits: {
+        fileSize: 1024 * 1024 * 1024,
+      },
+    }),
+  )
   async importCsv(@UploadedFile() file: any) {
     if (!file) {
       throw new BadRequestException({
@@ -60,9 +74,14 @@ export class ProfileController {
       });
     }
 
-    const stream = Readable.from(file.buffer);
+    const filePath = file.path ?? join('/tmp', file.filename);
+    const stream = createReadStream(filePath);
 
-    return await this.profileImportService.importCsvStream(stream);
+    try {
+      return await this.profileImportService.importCsvStream(stream);
+    } finally {
+      await fsPromises.unlink(filePath).catch(() => undefined);
+    }
   }
 
   @Post()

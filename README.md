@@ -9,7 +9,7 @@ NestJS backend for the Profile Intelligence System. It enriches submitted names 
 - Supports GitHub OAuth with PKCE for browser and CLI clients.
 - Issues short-lived access tokens and rotating refresh tokens.
 - Enforces role-based access control on `/api/*` profile routes.
-- Supports structured filters, natural-language search, pagination metadata, and CSV export.
+- Supports structured filters, natural-language search, pagination metadata, CSV export, and streaming CSV import.
 - Uses centralized environment configuration through `@nestjs/config`.
 
 ## Tech stack
@@ -150,6 +150,7 @@ The backend is compatible with the Insighta CLI flow and exposes the same auth a
 - `insighta profiles get <id>` - calls `GET /api/profiles/:id`.
 - `insighta profiles create --name <name>` - calls `POST /api/profiles`.
 - `insighta profiles export` - calls `GET /api/profiles/export?format=csv`.
+- `insighta profiles import` - uploads a CSV file to `POST /api/profiles/import`.
 
 ### CLI credential model
 
@@ -378,6 +379,48 @@ GET /api/profiles/export?format=csv
 
 Returns `text/csv` with a downloadable filename.
 
+#### CSV import
+
+```http
+POST /api/profiles/import
+```
+
+Upload as `multipart/form-data` with a `file` field containing a CSV.
+
+Behavior:
+
+- streams the uploaded file from disk rather than loading it all into memory
+- parses rows incrementally
+- processes data in batches
+- skips malformed rows and invalid values
+- ignores duplicate names at the database layer
+- returns a summary of total, inserted, skipped, and skip reasons
+
+Example upload:
+
+```bash
+curl -X POST "http://localhost:8000/api/profiles/import" \
+  -H "Authorization: Bearer <token>" \
+  -H "X-API-Version: 1" \
+  -F "file=@profiles.csv;type=text/csv"
+```
+
+Example response:
+
+```json
+{
+  "status": "success",
+  "total_rows": 50000,
+  "inserted": 48231,
+  "skipped": 1769,
+  "reasons": {
+    "duplicate_name": 1203,
+    "invalid_age": 312,
+    "missing_fields": 254
+  }
+}
+```
+
 Column order:
 
 ```text
@@ -400,6 +443,13 @@ id, name, gender, gender_probability, age, age_group, country_id, country_name, 
   "created_at": "2026-04-29T12:00:00.000Z"
 }
 ```
+
+## Implementation notes
+
+- The CSV import endpoint uses Multer disk storage so uploads are not buffered in memory.
+- The importer reads the temp file as a stream and feeds it into `csv-parser`.
+- Invalid rows are skipped instead of failing the whole upload.
+- A runtime schema repair service patches `created_at` and `updated_at` defaults on startup.
 
 ## Database models
 
