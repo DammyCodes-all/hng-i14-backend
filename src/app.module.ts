@@ -63,7 +63,7 @@ class AppThrottlerGuard extends ThrottlerGuard {
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
-      synchronize: true,
+      synchronize: false,
       autoLoadEntities: true,
       logging: ['error'],
       ssl: { rejectUnauthorized: false },
