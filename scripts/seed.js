@@ -124,6 +124,14 @@ function normalizeDate(value) {
   return new Date().toISOString();
 }
 
+function chunkArray(items, chunkSize) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
 async function createTables(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS profiles (
@@ -208,65 +216,56 @@ async function loadExistingUserGithubIds(client) {
 async function seedProfiles(client, profiles, existingNames) {
   let skipped = 0;
   let inserted = 0;
+  const rows = [];
 
   console.log(`Seeding profiles: scanning ${profiles.length} record(s)...`);
 
-  for (let index = 0; index < profiles.length; index += 1) {
-    const item = profiles[index];
+  for (const item of profiles) {
     const name = normalizeNullableString(item.name);
     if (!name) {
       skipped += 1;
       continue;
     }
 
-    const exists = await client.query(
-      'SELECT 1 FROM profiles WHERE name = $1 LIMIT 1',
-      [name],
-    );
-    if (exists.rowCount > 0) {
-      skipped += 1;
-      continue;
-    }
+    rows.push([
+      normalizeNullableString(item.id) || randomUUID(),
+      name,
+      normalizeNullableString(item.gender),
+      normalizeNumber(item.gender_probability),
+      normalizeNumber(item.age),
+      normalizeNullableString(item.age_group),
+      normalizeNullableString(item.country_id),
+      normalizeNullableString(item.country_name),
+      normalizeNumber(item.country_probability),
+      normalizeDate(item.created_at),
+    ]);
+    existingNames.add(name);
+  }
 
-    const id = normalizeNullableString(item.id) || randomUUID();
-    const gender = normalizeNullableString(item.gender);
-    const genderProbability = normalizeNumber(item.gender_probability);
-    const age = normalizeNumber(item.age);
-    const ageGroup = normalizeNullableString(item.age_group);
-    const countryId = normalizeNullableString(item.country_id);
-    const countryName = normalizeNullableString(item.country_name);
-    const countryProbability = normalizeNumber(item.country_probability);
-    const createdAt = normalizeDate(item.created_at);
+  for (const batch of chunkArray(rows, 250)) {
+    const placeholders = batch
+      .map(
+        (_, rowIndex) =>
+          `(${batch[rowIndex]
+            .map((__, columnIndex) => `$${rowIndex * 10 + columnIndex + 1}`)
+            .join(', ')})`,
+      )
+      .join(', ');
 
-    await client.query(
+    const parameters = batch.flat();
+    const result = await client.query(
       `
         INSERT INTO profiles
           (id, name, gender, gender_probability, age, age_group, country_id, country_name, country_probability, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ${placeholders}
       `,
-      [
-        id,
-        name,
-        gender,
-        genderProbability,
-        age,
-        ageGroup,
-        countryId,
-        countryName,
-        countryProbability,
-        createdAt,
-      ],
+      parameters,
     );
 
-    existingNames.add(name);
-
-    inserted += 1;
-
-    if (inserted % 250 === 0) {
-      console.log(
-        `Seeding profiles progress: inserted ${inserted}, skipped ${skipped}`,
-      );
-    }
+    inserted += result.rowCount;
+    console.log(
+      `Seeding profiles progress: inserted ${inserted}, skipped ${skipped}`,
+    );
   }
 
   return { inserted, skipped };
@@ -275,11 +274,11 @@ async function seedProfiles(client, profiles, existingNames) {
 async function seedUsers(client, users, existingGithubIds) {
   let skipped = 0;
   let inserted = 0;
+  const rows = [];
 
   console.log(`Seeding users: scanning ${users.length} record(s)...`);
 
-  for (let index = 0; index < users.length; index += 1) {
-    const item = users[index];
+  for (const item of users) {
     const githubId = normalizeNullableString(item.github_id);
     const username = normalizeNullableString(item.username);
 
@@ -293,44 +292,48 @@ async function seedUsers(client, users, existingGithubIds) {
       continue;
     }
 
-    const id = normalizeNullableString(item.id) || randomUUID();
-    const email = normalizeNullableString(item.email);
-    const avatarUrl = normalizeNullableString(item.avatar_url);
-    const role = item.role === 'admin' ? 'admin' : 'analyst';
-    const isActive = normalizeBoolean(item.is_active, true);
-    const lastLoginAt = normalizeDate(item.last_login_at);
-    const hasLastLogin =
-      typeof item.last_login_at === 'string' && item.last_login_at.trim();
-    const createdAt = normalizeDate(item.created_at);
+    rows.push([
+      normalizeNullableString(item.id) || randomUUID(),
+      githubId,
+      username,
+      normalizeNullableString(item.email),
+      normalizeNullableString(item.avatar_url),
+      item.role === 'admin' ? 'admin' : 'analyst',
+      normalizeBoolean(item.is_active, true),
+      typeof item.last_login_at === 'string' && item.last_login_at.trim()
+        ? normalizeDate(item.last_login_at)
+        : null,
+      normalizeDate(item.created_at),
+    ]);
 
-    await client.query(
+    existingGithubIds.add(githubId);
+  }
+
+  for (const batch of chunkArray(rows, 250)) {
+    const placeholders = batch
+      .map(
+        (_, rowIndex) =>
+          `(${batch[rowIndex]
+            .map((__, columnIndex) => `$${rowIndex * 9 + columnIndex + 1}`)
+            .join(', ')})`,
+      )
+      .join(', ');
+
+    const parameters = batch.flat();
+    const result = await client.query(
       `
         INSERT INTO users
           (id, github_id, username, email, avatar_url, role, is_active, last_login_at, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ${placeholders}
       `,
-      [
-        id,
-        githubId,
-        username,
-        email,
-        avatarUrl,
-        role,
-        isActive,
-        hasLastLogin ? lastLoginAt : null,
-        createdAt,
-      ],
+      parameters,
     );
 
-    existingGithubIds.add(githubId);
+    inserted += result.rowCount;
 
-    inserted += 1;
-
-    if (inserted % 100 === 0) {
-      console.log(
-        `Seeding users progress: inserted ${inserted}, skipped ${skipped}`,
-      );
-    }
+    console.log(
+      `Seeding users progress: inserted ${inserted}, skipped ${skipped}`,
+    );
   }
 
   return { inserted, skipped };
