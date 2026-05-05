@@ -144,7 +144,7 @@ async function createTables(client) {
       country_id varchar(2) NULL,
       country_name text NULL,
       country_probability double precision NULL,
-      created_at timestamptz NOT NULL
+      created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -158,7 +158,7 @@ async function createTables(client) {
       role text NOT NULL DEFAULT 'analyst',
       is_active boolean NOT NULL DEFAULT true,
       last_login_at timestamptz NULL,
-      created_at timestamptz NOT NULL
+      created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -169,8 +169,8 @@ async function createTables(client) {
       refresh_token_hash text NOT NULL,
       is_invalidated boolean NOT NULL DEFAULT false,
       expires_at timestamptz NOT NULL,
-      created_at timestamptz NOT NULL,
-      updated_at timestamptz NOT NULL
+      created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 

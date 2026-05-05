@@ -41,6 +41,6 @@ export class ProfileEntity {
   @Column({ type: 'double precision', nullable: true })
   country_probability!: number | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

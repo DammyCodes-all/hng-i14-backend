@@ -37,6 +37,6 @@ export class UserEntity {
   @Column({ type: 'timestamptz', nullable: true })
   last_login_at!: Date | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

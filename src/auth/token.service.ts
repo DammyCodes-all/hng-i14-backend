@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { sign, verify, JwtPayload } from 'jsonwebtoken';
@@ -19,24 +19,11 @@ export interface AccessTokenClaims extends JwtPayload {
 }
 
 @Injectable()
-export class TokenService implements OnModuleInit {
+export class TokenService {
   constructor(
     @InjectRepository(RefreshTokenEntity)
     private readonly tokenRepository: Repository<RefreshTokenEntity>,
   ) {}
-
-  async onModuleInit(): Promise<void> {
-    await this.tokenRepository.query(`
-      ALTER TABLE "refresh_tokens"
-      ALTER COLUMN "created_at" SET DEFAULT CURRENT_TIMESTAMP
-    `);
-
-    await this.tokenRepository.query(`
-      UPDATE "refresh_tokens"
-      SET "created_at" = NOW()
-      WHERE "created_at" IS NULL
-    `);
-  }
 
   hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
