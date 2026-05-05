@@ -227,6 +227,11 @@ async function seedProfiles(client, profiles, existingNames) {
       continue;
     }
 
+    if (existingNames.has(name)) {
+      skipped += 1;
+      continue;
+    }
+
     rows.push([
       normalizeNullableString(item.id) || randomUUID(),
       name,
