@@ -175,12 +175,6 @@ export class ProfileImportService {
       parser.on('error', (err) => {
         encounteredError = true;
         errorMessage = err instanceof Error ? err.message : String(err);
-        skipped += batch.length;
-        if (batch.length > 0) {
-          reasons['malformed_row'] =
-            (reasons['malformed_row'] || 0) + batch.length;
-          batch.length = 0;
-        }
 
         this.logger.error('CSV parse error', err.stack || err);
 
