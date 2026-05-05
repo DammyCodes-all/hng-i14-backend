@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
 import { GetAllProfileQueryDto, SearchProfileDto } from './dto/profile.dto';
 import { PaginatedResponse } from './dto/pagination.dto';
+import { RedisService } from '../redis/redis.service';
 import {
   parseAboveValue,
   parseBelowValue,
@@ -19,13 +20,145 @@ const normalizeLower = (value: string | null | undefined): string | null =>
 const normalizeUpper = (value: string | null | undefined): string | null =>
   value ? value.trim().toUpperCase() : null;
 
+const QUERY_CACHE_PREFIX = 'profiles:query:v1';
+const QUERY_CACHE_TTL_SECONDS = 180;
+const PROFILE_BY_ID_CACHE_PREFIX = 'profiles:by-id:v1';
+const PROFILE_BY_ID_CACHE_TTL_SECONDS = 300;
+
+type ProfileQueryFilters = {
+  gender?: string;
+  country_id?: string;
+  country_name?: string;
+  age_group?: string;
+  min_age?: number;
+  max_age?: number;
+  min_gender_probability?: number;
+  min_country_probability?: number;
+  sort_by?: string;
+  order?: string;
+  page: number;
+  limit: number;
+};
+
+type CachedProfileQueryResult = {
+  total: number;
+  data: Profile[];
+};
+
 // eslint-disable @typescript-eslint/no-unsafe-assignment
 @Injectable()
 export class ProfileService {
   constructor(
     @InjectRepository(ProfileEntity)
     private readonly profileRepository: Repository<ProfileEntity>,
+    private readonly redisService: RedisService,
   ) {}
+
+  private toProfile(entity: ProfileEntity): Profile {
+    return {
+      id: entity.id,
+      name: entity.name,
+      gender: entity.gender ?? null,
+      gender_probability: entity.gender_probability ?? null,
+      age: entity.age ?? null,
+      age_group: entity.age_group ?? null,
+      country_id: entity.country_id ?? null,
+      country_name: entity.country_name ?? null,
+      country_probability: entity.country_probability ?? null,
+      created_at: entity.created_at.toISOString(),
+    };
+  }
+
+  private buildCanonicalCacheKey(filters: ProfileQueryFilters): string {
+    const canonical = {
+      age_group: filters.age_group ?? null,
+      country_id: filters.country_id ?? null,
+      country_name: filters.country_name ?? null,
+      gender: filters.gender ?? null,
+      limit: filters.limit,
+      max_age: filters.max_age ?? null,
+      min_age: filters.min_age ?? null,
+      min_country_probability: filters.min_country_probability ?? null,
+      min_gender_probability: filters.min_gender_probability ?? null,
+      order: filters.order ?? null,
+      page: filters.page,
+      sort_by: filters.sort_by ?? null,
+    };
+
+    return `${QUERY_CACHE_PREFIX}:${Buffer.from(
+      JSON.stringify(canonical),
+    ).toString('base64url')}`;
+  }
+
+  private buildProfileByIdCacheKey(id: string): string {
+    return `${PROFILE_BY_ID_CACHE_PREFIX}:${id}`;
+  }
+
+  private applyProfileFilters(
+    qb: ReturnType<Repository<ProfileEntity>['createQueryBuilder']>,
+    filters: ProfileQueryFilters,
+  ) {
+    if (filters.gender)
+      qb.andWhere('p.gender = :gender', { gender: filters.gender });
+    if (filters.country_id)
+      qb.andWhere('p.country_id = :country_id', {
+        country_id: filters.country_id,
+      });
+    if (filters.country_name)
+      qb.andWhere('p.country_name = :country_name', {
+        country_name: filters.country_name,
+      });
+    if (filters.age_group)
+      qb.andWhere('p.age_group = :age_group', { age_group: filters.age_group });
+
+    if (filters.min_age != null)
+      qb.andWhere('p.age >= :min_age', { min_age: filters.min_age });
+    if (filters.max_age != null)
+      qb.andWhere('p.age <= :max_age', { max_age: filters.max_age });
+
+    if (filters.min_gender_probability != null)
+      qb.andWhere('p.gender_probability >= :mgp', {
+        mgp: filters.min_gender_probability,
+      });
+
+    if (filters.min_country_probability != null)
+      qb.andWhere('p.country_probability >= :mcp', {
+        mcp: filters.min_country_probability,
+      });
+  }
+
+  private async getCachedProfileQueryResult(
+    filters: ProfileQueryFilters,
+  ): Promise<CachedProfileQueryResult> {
+    const cacheKey = this.buildCanonicalCacheKey(filters);
+    const cached =
+      await this.redisService.get<CachedProfileQueryResult>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const qb = this.profileRepository.createQueryBuilder('p');
+    this.applyProfileFilters(qb, filters);
+
+    if (filters.sort_by) {
+      const direction =
+        (filters.order ?? 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+      qb.orderBy(`p.${filters.sort_by}`, direction);
+    }
+
+    qb.skip((filters.page - 1) * filters.limit).take(filters.limit);
+
+    const [entities, total] = await qb.getManyAndCount();
+    const data = entities.map((entity) => this.toProfile(entity));
+    const result: CachedProfileQueryResult = { total, data };
+
+    await this.redisService.set(cacheKey, result, QUERY_CACHE_TTL_SECONDS);
+    return result;
+  }
+
+  private async invalidateProfileQueryCache(): Promise<void> {
+    await this.redisService.clearPattern(`${QUERY_CACHE_PREFIX}:*`);
+  }
 
   async createProfile(createProfileDto: {
     name: string;
@@ -103,18 +236,9 @@ export class ProfileService {
     entity.country_name = null;
 
     const saved = await this.profileRepository.save(entity);
+    await this.invalidateProfileQueryCache();
 
-    const profile: Profile = {
-      id: saved.id,
-      name: saved.name,
-      gender: saved.gender ?? null,
-      gender_probability: saved.gender_probability ?? null,
-      age: saved.age ?? null,
-      age_group: saved.age_group ?? null,
-      country_id: saved.country_id ?? null,
-      country_probability: saved.country_probability ?? null,
-      created_at: saved.created_at.toISOString(),
-    };
+    const profile: Profile = this.toProfile(saved);
 
     return {
       status: 'success',
@@ -124,23 +248,29 @@ export class ProfileService {
 
   async getProfile(id: UUID) {
     const idStr = id as unknown as string;
+    const cacheKey = this.buildProfileByIdCacheKey(idStr);
+
+    const cachedProfile = await this.redisService.get<Profile>(cacheKey);
+    if (cachedProfile) {
+      return {
+        status: 'success',
+        data: cachedProfile,
+      };
+    }
+
     const entity = await this.profileRepository.findOneBy({
       id: idStr,
     });
 
     if (!entity) throw new Error('Profile not found');
 
-    const profile: Profile = {
-      id: entity.id,
-      name: entity.name,
-      gender: entity.gender ?? null,
-      gender_probability: entity.gender_probability ?? null,
-      age: entity.age ?? null,
-      age_group: entity.age_group ?? null,
-      country_id: entity.country_id ?? null,
-      country_probability: entity.country_probability ?? null,
-      created_at: entity.created_at.toISOString(),
-    };
+    const profile: Profile = this.toProfile(entity);
+
+    await this.redisService.set(
+      cacheKey,
+      profile,
+      PROFILE_BY_ID_CACHE_TTL_SECONDS,
+    );
 
     return {
       status: 'success',
@@ -155,7 +285,6 @@ export class ProfileService {
     const { q, page, limit } = queryObj;
     const raw = q || '';
     const query = raw.toLowerCase();
-    const qb = this.profileRepository.createQueryBuilder('p');
 
     const genderMatch = query.includes('male and female')
       ? null
@@ -181,18 +310,6 @@ export class ProfileService {
         ? { min: 60, max: 120 }
         : null;
 
-    if (ageGroupMatch)
-      qb.andWhere('p.age_group = :age_group', { age_group: ageGroupMatch });
-
-    if (genderMatch)
-      qb.andWhere('p.gender = :gender', { gender: genderMatch });
-
-    if (ageLimits)
-      qb.andWhere('p.age BETWEEN :min AND :max', {
-        min: ageLimits.min,
-        max: ageLimits.max,
-      });
-
     const minAge = parseAboveValue(raw);
     const maxAge = parseBelowValue(raw);
     const fromCountry = parseFromCountry(raw);
@@ -212,47 +329,37 @@ export class ProfileService {
       );
     }
 
-    if (minAge != null) {
-      qb.andWhere('p.age >= :min_age', { min_age: minAge });
-    }
+    const pageNumber = page ?? 1;
+    const pageSize = limit ?? 10;
 
-    if (maxAge != null) {
-      qb.andWhere('p.age <= :max_age', { max_age: maxAge });
-    }
+    const computedMinAge =
+      ageLimits && minAge != null
+        ? Math.max(ageLimits.min, minAge)
+        : (ageLimits?.min ?? minAge ?? undefined);
+    const computedMaxAge =
+      ageLimits && maxAge != null
+        ? Math.min(ageLimits.max, maxAge)
+        : (ageLimits?.max ?? maxAge ?? undefined);
 
-    if (fromCountry) {
-      if (fromCountry.country_id) {
-        const cidParam = fromCountry.country_id.toUpperCase();
-        qb.andWhere('p.country_id = :country_id', { country_id: cidParam });
-      } else if (fromCountry.country_name) {
-        const nameParam = fromCountry.country_name;
-        qb.andWhere('p.country_name = :country_name', {
-          country_name: nameParam,
-        });
-      }
-    }
+    const filters: ProfileQueryFilters = {
+      gender: genderMatch ?? undefined,
+      age_group: ageGroupMatch ?? undefined,
+      country_id: fromCountry?.country_id
+        ? fromCountry.country_id.toUpperCase()
+        : undefined,
+      country_name: fromCountry?.country_name ?? undefined,
+      min_age: computedMinAge,
+      max_age: computedMaxAge,
+      page: pageNumber,
+      limit: pageSize,
+    };
 
-    if (page && limit) {
-      qb.skip((page - 1) * limit).take(limit);
-    }
-
-    const [entities, total] = await qb.getManyAndCount();
-    const profiles = entities.map((e) => ({
-      id: e.id,
-      name: e.name,
-      gender: e.gender ?? null,
-      gender_probability: e.gender_probability ?? null,
-      age: e.age ?? null,
-      age_group: e.age_group ?? null,
-      country_id: e.country_id ?? null,
-      country_name: e.country_name ?? null,
-      country_probability: e.country_probability ?? null,
-      created_at: e.created_at.toISOString(),
-    }));
+    const { data: profiles, total } =
+      await this.getCachedProfileQueryResult(filters);
 
     return new PaginatedResponse({
-      page: page ?? 1,
-      limit: limit ?? 10,
+      page: pageNumber,
+      limit: pageSize,
       total,
       data: profiles,
       baseUrl,
@@ -278,54 +385,22 @@ export class ProfileService {
       limit,
     } = query;
 
-    const qb = this.profileRepository.createQueryBuilder('p');
+    const filters: ProfileQueryFilters = {
+      gender: gender ? gender.toLowerCase() : undefined,
+      country_id: country_id ? country_id.toUpperCase() : undefined,
+      age_group: age_group ? age_group.toLowerCase() : undefined,
+      min_age,
+      max_age,
+      min_gender_probability,
+      min_country_probability,
+      sort_by,
+      order,
+      page: page ?? 1,
+      limit: limit ?? 10,
+    };
 
-    if (gender)
-      qb.andWhere('p.gender = :gender', { gender: gender.toLowerCase() });
-    if (country_id)
-      qb.andWhere('p.country_id = :country_id', {
-        country_id: country_id.toUpperCase(),
-      });
-    if (age_group)
-      qb.andWhere('p.age_group = :age_group', { age_group: age_group.toLowerCase() });
-
-    if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
-    if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
-
-    if (min_gender_probability != null)
-      qb.andWhere('p.gender_probability >= :mgp', {
-        mgp: min_gender_probability,
-      });
-
-    if (min_country_probability != null)
-      qb.andWhere('p.country_probability >= :mcp', {
-        mcp: min_country_probability,
-      });
-
-    if (sort_by) {
-      const direction =
-        (order || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-      qb.orderBy(`p.${sort_by}`, direction);
-    }
-
-    if (page != null && limit != null) {
-      qb.skip((page - 1) * limit).take(limit);
-    }
-
-    const [entities, total] = await qb.getManyAndCount();
-
-    const profiles: Profile[] = entities.map((e) => ({
-      id: e.id,
-      name: e.name,
-      gender: e.gender ?? null,
-      gender_probability: e.gender_probability ?? null,
-      age: e.age ?? null,
-      age_group: e.age_group ?? null,
-      country_id: e.country_id ?? null,
-      country_name: e.country_name ?? null,
-      country_probability: e.country_probability ?? null,
-      created_at: e.created_at.toISOString(),
-    }));
+    const { data: profiles, total } =
+      await this.getCachedProfileQueryResult(filters);
 
     return new PaginatedResponse({
       page: page ?? 1,
@@ -369,7 +444,9 @@ export class ProfileService {
         country_id: country_id.toUpperCase(),
       });
     if (age_group)
-      qb.andWhere('p.age_group = :age_group', { age_group: age_group.toLowerCase() });
+      qb.andWhere('p.age_group = :age_group', {
+        age_group: age_group.toLowerCase(),
+      });
 
     if (min_age != null) qb.andWhere('p.age >= :min_age', { min_age });
     if (max_age != null) qb.andWhere('p.age <= :max_age', { max_age });
@@ -452,6 +529,9 @@ export class ProfileService {
   }
 
   async deleteProfile(id: UUID) {
+    const idStr = id as unknown as string;
     await this.profileRepository.delete({ id });
+    await this.redisService.delete(this.buildProfileByIdCacheKey(idStr));
+    await this.invalidateProfileQueryCache();
   }
 }
