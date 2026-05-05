@@ -83,7 +83,6 @@ export class ProfileImportService {
               (reasons['duplicate_name'] || 0) + duplicateCount;
           }
         } catch (err) {
-          // best-effort fallback: try per-row save to detect conflicts
           this.logger.warn(
             'Bulk insert failed, falling back to per-row save for this batch',
           );
@@ -115,12 +114,6 @@ export class ProfileImportService {
         if (!row || !row.name || String(row.name).trim() === '') {
           skipped += 1;
           reasons['missing_fields'] = (reasons['missing_fields'] || 0) + 1;
-          return;
-        }
-
-        if (row.age && Number(row.age) < 0) {
-          skipped += 1;
-          reasons['invalid_age'] = (reasons['invalid_age'] || 0) + 1;
           return;
         }
 
