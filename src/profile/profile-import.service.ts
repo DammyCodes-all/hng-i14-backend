@@ -30,7 +30,7 @@ export class ProfileImportService {
 
   async importCsvStream(input: Readable): Promise<Summary> {
     return new Promise<Summary>((resolve, reject) => {
-      const parser = csvParser({ separator: ',', skipLines: 0, strict: false });
+      const parser = csvParser({ separator: ',', strict: false });
 
       let total = 0;
       let inserted = 0;
@@ -45,30 +45,7 @@ export class ProfileImportService {
         if (batch.length === 0) return;
         const current = batch.splice(0, batch.length);
 
-        const names = current.map((r) => normalizeName(String(r.name)));
-
-        const existing = await this.profileRepository
-          .createQueryBuilder('p')
-          .select('p.name', 'name')
-          .where('p.name IN (:...names)', { names })
-          .getRawMany();
-
-        const existingSet = new Set(existing.map((e: any) => e.name));
-
-        const toInsert = current.filter(
-          (r) => !existingSet.has(normalizeName(String(r.name))),
-        );
-        const duplicatesCount = current.length - toInsert.length;
-
-        if (duplicatesCount > 0) {
-          skipped += duplicatesCount;
-          reasons['duplicate_name'] =
-            (reasons['duplicate_name'] || 0) + duplicatesCount;
-        }
-
-        if (toInsert.length === 0) return;
-
-        const entities = toInsert.map((r) => {
+        const entities = current.map((r) => {
           const e: Partial<ProfileEntity> = {};
           e.name = normalizeName(String(r.name));
           e.gender = normalizeLower(r.gender ?? null);
@@ -88,7 +65,7 @@ export class ProfileImportService {
         });
 
         try {
-          await this.profileRepository
+          const result = await this.profileRepository
             .createQueryBuilder()
             .insert()
             .into(ProfileEntity)
@@ -96,7 +73,15 @@ export class ProfileImportService {
             .orIgnore()
             .execute();
 
-          inserted += entities.length;
+          const insertedCount = result.identifiers.length;
+          const duplicateCount = entities.length - insertedCount;
+
+          inserted += insertedCount;
+          if (duplicateCount > 0) {
+            skipped += duplicateCount;
+            reasons['duplicate_name'] =
+              (reasons['duplicate_name'] || 0) + duplicateCount;
+          }
         } catch (err) {
           // best-effort fallback: try per-row save to detect conflicts
           this.logger.warn(
@@ -139,6 +124,12 @@ export class ProfileImportService {
           return;
         }
 
+        if (row.age && (Number.isNaN(Number(row.age)) || Number(row.age) < 0)) {
+          skipped += 1;
+          reasons['invalid_age'] = (reasons['invalid_age'] || 0) + 1;
+          return;
+        }
+
         if (row.gender && typeof row.gender === 'string') {
           const g = String(row.gender).trim().toLowerCase();
           if (g !== 'male' && g !== 'female' && g !== '') {
@@ -152,13 +143,13 @@ export class ProfileImportService {
 
         if (batch.length >= this.BATCH_SIZE) {
           try {
-            (input as Readable).pause();
+            parser.pause();
           } catch {}
 
           flushBatch()
             .then(() => {
               try {
-                (input as Readable).resume();
+                parser.resume();
               } catch {}
             })
             .catch((err) => parser.emit('error', err));

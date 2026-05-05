@@ -31,6 +31,7 @@ import {
   RolesGuard,
 } from 'src/auth/guards';
 import { Roles } from 'src/auth/decorators';
+import { join } from 'path';
 import { Readable } from 'stream';
 
 @UseGuards(JwtGuard, ActiveUserGuard, ApiVersionGuard, RolesGuard)
