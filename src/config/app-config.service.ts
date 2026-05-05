@@ -41,6 +41,14 @@ export class AppConfigService {
     return this.configService.get<number>('CLI_CALLBACK_PORT', 9876);
   }
 
+  get redisUrl(): string {
+    return this.configService.getOrThrow<string>('REDIS_URL');
+  }
+
+  get databaseUrl(): string {
+    return this.configService.getOrThrow<string>('DATABASE_URL');
+  }
+
   logConfig(): void {
     console.log('[AppConfigService] Configuration loaded:', {
       githubClientId: this.githubClientId
@@ -52,6 +60,8 @@ export class AppConfigService {
       webPortalUrl: this.webPortalUrl,
       port: this.port,
       nodeEnv: this.nodeEnv,
+      cliCallbackPort: this.cliCallbackPort,
+      redisUrl: this.redisUrl ? `${this.redisUrl.slice(0, 10)}...` : 'MISSING',
     });
   }
 }

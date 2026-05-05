@@ -5,12 +5,10 @@ import { AuthModule } from './auth/auth.module';
 import { ProfileModule } from './profile/profile.module';
 import { UsersModule } from './users/users.module';
 import { AppConfigModule } from './config/app-config.module';
+import { RedisModule } from './redis/redis.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
-import {
-  ThrottlerGuard,
-  ThrottlerModule,
-} from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type { ExecutionContext } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 
@@ -42,13 +40,15 @@ class AppThrottlerGuard extends ThrottlerGuard {
                 options: {
                   colorize: true,
                   singleLine: true,
-                  ignore: 'pid,hostname,req.headers,req.remoteAddress,req.remotePort,res.headers',
+                  ignore:
+                    'pid,hostname,req.headers,req.remoteAddress,req.remotePort,res.headers',
                   messageFormat: '{levelLabel} {msg}',
                 },
               },
       },
     }),
     AppConfigModule,
+    RedisModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -61,10 +61,12 @@ class AppThrottlerGuard extends ThrottlerGuard {
     ProfileModule,
     UsersModule,
     TypeOrmModule.forRoot({
-      type: 'better-sqlite3',
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
       synchronize: true,
-      database: 'db/database.db',
       autoLoadEntities: true,
+      logging: ['error'],
+      ssl: { rejectUnauthorized: false },
     }),
   ],
   providers: [
