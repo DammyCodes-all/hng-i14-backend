@@ -67,6 +67,12 @@ class AppThrottlerGuard extends ThrottlerGuard {
       autoLoadEntities: true,
       logging: ['error'],
       ssl: { rejectUnauthorized: false },
+      extra: {
+        max: 30,
+        min: 5,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+      },
     }),
   ],
   providers: [
