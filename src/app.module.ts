@@ -5,7 +5,6 @@ import { AuthModule } from './auth/auth.module';
 import { ProfileModule } from './profile/profile.module';
 import { UsersModule } from './users/users.module';
 import { AppConfigModule } from './config/app-config.module';
-import { SchemaRepairService } from './config/schema-repair.service';
 import { RedisModule } from './redis/redis.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
@@ -78,7 +77,6 @@ class AppThrottlerGuard extends ThrottlerGuard {
   ],
   providers: [
     AppService,
-    SchemaRepairService,
     {
       provide: APP_GUARD,
       useClass: AppThrottlerGuard,
