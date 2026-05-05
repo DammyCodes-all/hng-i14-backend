@@ -10,8 +10,10 @@ export type UserRole = 'admin' | 'analyst';
 
 @Entity('users')
 @Index('IDX_users_github_id', ['github_id'], { unique: true })
+@Index('IDX_users_email', ['email'])
+@Index('IDX_users_role_active', ['role', 'is_active'])
 export class UserEntity {
-  @PrimaryColumn({ type: 'text' })
+  @PrimaryColumn({ type: 'varchar' })
   id!: string;
 
   @Column({ type: 'text' })
@@ -32,9 +34,9 @@ export class UserEntity {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   last_login_at!: Date | null;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;
 }

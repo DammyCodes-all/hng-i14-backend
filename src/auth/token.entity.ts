@@ -11,7 +11,7 @@ import {
 @Index('IDX_refresh_tokens_user_id', ['user_id'])
 @Index('IDX_refresh_tokens_expires_at', ['expires_at'])
 export class RefreshTokenEntity {
-  @PrimaryColumn({ type: 'text' })
+  @PrimaryColumn({ type: 'varchar' })
   id!: string;
 
   @Column({ type: 'text' })
@@ -23,12 +23,12 @@ export class RefreshTokenEntity {
   @Column({ type: 'boolean', default: false })
   is_invalidated!: boolean;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   expires_at!: Date;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   created_at!: Date;
 
-  @UpdateDateColumn({ type: 'datetime' })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at!: Date;
 }
