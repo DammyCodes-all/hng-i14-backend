@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Readable } from 'stream';
-const csvParser: any = require('csv-parser');
+import { Readable, Transform } from 'stream';
+import csvParser from 'csv-parser';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileEntity } from './profile.entity';
@@ -18,6 +18,17 @@ type Summary = {
   reasons: Record<string, number>;
 };
 
+type CsvRow = {
+  name?: string;
+  gender?: string;
+  gender_probability?: string;
+  age?: string;
+  age_group?: string;
+  country_id?: string;
+  country_name?: string;
+  country_probability?: string;
+};
+
 @Injectable()
 export class ProfileImportService {
   private readonly logger = new Logger(ProfileImportService.name);
@@ -30,7 +41,7 @@ export class ProfileImportService {
 
   async importCsvStream(input: Readable): Promise<Summary> {
     return new Promise<Summary>((resolve, reject) => {
-      const parser = csvParser({ separator: ',', strict: false });
+      const parser: Transform = csvParser({ separator: ',', strict: false });
 
       let total = 0;
       let inserted = 0;
@@ -38,32 +49,34 @@ export class ProfileImportService {
       let encounteredError = false;
       let errorMessage: string | null = null;
 
-      const reasons: Record<string, number> = {} as Record<string, number>;
+      const reasons: Record<string, number> = {};
 
-      const batch: Array<Record<string, any>> = [];
+      const batch: CsvRow[] = [];
       let headerCount: number | null = null;
 
-      const flushBatch = async () => {
+      const flushBatch = async (): Promise<void> => {
         if (batch.length === 0) return;
         const current = batch.splice(0, batch.length);
 
         const entities = current.map((r) => {
-          const e: Partial<ProfileEntity> = {};
-          e.name = normalizeName(String(r.name));
-          e.gender = normalizeLower(r.gender ?? null);
-          e.gender_probability = r.gender_probability
-            ? Number(r.gender_probability)
-            : null;
-          e.age = r.age ? Number(r.age) : null;
-          e.age_group = normalizeLower(r.age_group ?? null);
-          e.country_id = normalizeUpper(r.country_id ?? null);
-          e.country_name = r.country_name
+          const entity = new ProfileEntity();
+          entity.name = normalizeName(r.name ?? '');
+          entity.gender = normalizeLower(r.gender);
+          entity.gender_probability =
+            r.gender_probability != null && r.gender_probability !== ''
+              ? Number(r.gender_probability)
+              : null;
+          entity.age = r.age != null && r.age !== '' ? Number(r.age) : null;
+          entity.age_group = normalizeLower(r.age_group);
+          entity.country_id = normalizeUpper(r.country_id);
+          entity.country_name = r.country_name
             ? String(r.country_name).trim()
             : null;
-          e.country_probability = r.country_probability
-            ? Number(r.country_probability)
-            : null;
-          return e;
+          entity.country_probability =
+            r.country_probability != null && r.country_probability !== ''
+              ? Number(r.country_probability)
+              : null;
+          return entity;
         });
 
         try {
@@ -81,26 +94,27 @@ export class ProfileImportService {
           inserted += insertedCount;
           if (duplicateCount > 0) {
             skipped += duplicateCount;
-            reasons['duplicate_name'] =
-              (reasons['duplicate_name'] || 0) + duplicateCount;
+            reasons.duplicate_name =
+              (reasons.duplicate_name || 0) + duplicateCount;
           }
-        } catch (err) {
+        } catch {
           this.logger.warn(
             'Bulk insert failed, falling back to per-row save for this batch',
           );
-          for (const e of entities) {
+
+          for (const entity of entities) {
             try {
-              await this.profileRepository.save(e as ProfileEntity);
+              await this.profileRepository.save(entity);
               inserted += 1;
-            } catch (inner) {
+            } catch {
               skipped += 1;
-              reasons['duplicate_name'] = (reasons['duplicate_name'] || 0) + 1;
+              reasons.duplicate_name = (reasons.duplicate_name || 0) + 1;
             }
           }
         }
       };
 
-      const finalize = async () => {
+      const finalize = async (): Promise<void> => {
         try {
           await flushBatch();
 
@@ -117,7 +131,7 @@ export class ProfileImportService {
               : reasons,
           });
         } catch (err) {
-          reject(err);
+          reject(err instanceof Error ? err : new Error(String(err)));
         }
       };
 
@@ -125,24 +139,24 @@ export class ProfileImportService {
         headerCount = headers.length;
       });
 
-      parser.on('data', (row: Record<string, any>) => {
+      parser.on('data', (row: CsvRow) => {
         total += 1;
 
         if (headerCount != null && Object.keys(row).length !== headerCount) {
           skipped += 1;
-          reasons['malformed_row'] = (reasons['malformed_row'] || 0) + 1;
+          reasons.malformed_row = (reasons.malformed_row || 0) + 1;
           return;
         }
 
-        if (!row || !row.name || String(row.name).trim() === '') {
+        if (!row.name || String(row.name).trim() === '') {
           skipped += 1;
-          reasons['missing_fields'] = (reasons['missing_fields'] || 0) + 1;
+          reasons.missing_fields = (reasons.missing_fields || 0) + 1;
           return;
         }
 
         if (row.age && (Number.isNaN(Number(row.age)) || Number(row.age) < 0)) {
           skipped += 1;
-          reasons['invalid_age'] = (reasons['invalid_age'] || 0) + 1;
+          reasons.invalid_age = (reasons.invalid_age || 0) + 1;
           return;
         }
 
@@ -150,7 +164,7 @@ export class ProfileImportService {
           const g = String(row.gender).trim().toLowerCase();
           if (g !== 'male' && g !== 'female' && g !== '') {
             skipped += 1;
-            reasons['invalid_gender'] = (reasons['invalid_gender'] || 0) + 1;
+            reasons.invalid_gender = (reasons.invalid_gender || 0) + 1;
             return;
           }
         }
@@ -158,34 +172,50 @@ export class ProfileImportService {
         batch.push(row);
 
         if (batch.length >= this.BATCH_SIZE) {
-          try {
-            parser.pause();
-          } catch {}
+          parser.pause();
 
           flushBatch()
             .then(() => {
-              try {
-                parser.resume();
-              } catch {}
+              parser.resume();
             })
-            .catch((err) => parser.emit('error', err));
+            .catch((err: unknown) => {
+              parser.emit(
+                'error',
+                err instanceof Error ? err : new Error(String(err)),
+              );
+            });
         }
       });
 
-      parser.on('error', (err) => {
+      parser.on('error', (err: unknown) => {
         encounteredError = true;
         errorMessage = err instanceof Error ? err.message : String(err);
 
-        this.logger.error('CSV parse error', err.stack || err);
+        this.logger.error(
+          'CSV parse error',
+          err instanceof Error ? err.stack : undefined,
+        );
 
-        finalize().catch(reject);
+        finalize().catch((finalizeErr: unknown) => {
+          reject(
+            finalizeErr instanceof Error
+              ? finalizeErr
+              : new Error(String(finalizeErr)),
+          );
+        });
       });
 
       parser.on('end', () => {
-        finalize().catch(reject);
+        finalize().catch((finalizeErr: unknown) => {
+          reject(
+            finalizeErr instanceof Error
+              ? finalizeErr
+              : new Error(String(finalizeErr)),
+          );
+        });
       });
 
-      input.pipe(parser as any);
+      input.pipe(parser);
     });
   }
 }
