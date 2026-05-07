@@ -18,7 +18,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Express } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { ProfileService } from './profile.service';
@@ -59,7 +59,9 @@ export class ProfileController {
       },
     }),
   )
-  async importCsv(@UploadedFile() file: any) {
+  async importCsv(
+    @UploadedFile() file: Express.Multer.File & { path?: string },
+  ) {
     if (!file) {
       throw new BadRequestException({
         status: 'error',
